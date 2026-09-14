@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saffron POS</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f0f0f;
+    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-app-region: drag;
+  }
+  .container {
+    text-align: center;
+    width: 400px;
+  }
+  .logo {
+    font-size: 48px;
+    color: #e8ff3a;
+    margin-bottom: 16px;
+  }
+  .title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 40px;
+  }
+  .progress-container {
+    width: 100%;
+    height: 3px;
+    background: #1e1e1e;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .progress-bar {
+    height: 100%;
+    background: #e8ff3a;
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+  .status {
+    font-size: 13px;
+    color: #999;
+    min-height: 20px;
+    transition: color 0.3s;
+  }
+  .status.error {
+    color: #ff4a4a;
+  }
+  .status.success {
+    color: #3aff8a;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">&#9670;</div>
+  <div class="title">Saffron POS</div>
+  <div class="subtitle">Point of Sale &amp; Business Management</div>
+  <div class="progress-container">
+    <div class="progress-bar" id="progress"></div>
+  </div>
+  <div class="status" id="status">Starting services...</div>
+</div>
+
+<script>
+  // Receive status updates from Electron main process via IPC
+  if (window.bukhariPOS) {
+    // Desktop mode — listen for status updates
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'status') {
+        updateStatus(event.data.message, event.data.progress, event.data.isError);
+      }
+    });
+  }
+
+  function updateStatus(message, progress, isError) {
+    const statusEl = document.getElementById('status');
+    const progressEl = document.getElementById('progress');
+    statusEl.textContent = message;
+    statusEl.className = 'status' + (isError ? ' error' : '');
+    if (typeof progress === 'number') {
+      progressEl.style.width = progress + '%';
+    }
+    if (isError) {
+      progressEl.style.background = '#ff4a4a';
+    }
+  }
+
+  // Simple animation for non-electron mode
+  let dotCount = 0;
+  setInterval(() => {
+    dotCount = (dotCount + 1) % 4;
+    const dots = '.'.repeat(dotCount);
+    const el = document.getElementById('status');
+    if (el.textContent.startsWith('Starting') || el.textContent.startsWith('Waiting')) {
+      el.textContent = el.textContent.replace(/\.+$/, '') + dots;
+    }
+  }, 500);
+</script>
+</body>
+</html>
