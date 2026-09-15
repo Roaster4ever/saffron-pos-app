@@ -1,6 +1,20 @@
 <?php
 // includes/config.php — Saffron POS Configuration
 
+// ── Load .env file for local dev ──
+function loadDotEnv($path) {
+    if (!file_exists($path)) return;
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if ($line[0] === '#' || strpos($line, '=') === false) continue;
+        [$key, $value] = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value);
+        if (!getenv($key)) putenv("{$key}={$value}");
+    }
+}
+loadDotEnv(dirname(__DIR__) . '/.env');
+
 // ── Detect runtime environment ──
 function isVercel() {
     return getenv('VERCEL') === '1' || getenv('VERCEL');
