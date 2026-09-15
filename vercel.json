@@ -4,9 +4,16 @@
     { "src": "includes/*.php", "use": "@vercel/php" },
     { "src": "pages/*.php", "use": "@vercel/php" }
   ],
+  "functions": {
+    "**/*.php": {
+      "maxDuration": 30
+    }
+  },
   "routes": [
     { "src": "/pos/(.*)", "dest": "/$1" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/$1" }
-  ]
+  ],
+  "outputDirectory": ".",
+  "cleanUrls": false
 }

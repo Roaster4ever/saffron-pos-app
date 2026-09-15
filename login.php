@@ -34,7 +34,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $stmt->execute();
             $user = $stmt->get_result()->fetch_assoc();
             if ($user && password_verify($password, $user['password'])) {
-                $conn->query("DELETE FROM login_attempts WHERE ip_address = '" . $conn->real_escape_string($ip) . "'");
+                // Clear rate limit attempts
+                $stmtDel = $conn->prepare("DELETE FROM login_attempts WHERE ip_address = ?");
+                $stmtDel->bind_param("s", $ip);
+                $stmtDel->execute();
                 session_regenerate_id(true);
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_name'] = $user['name'];
@@ -50,8 +53,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                 header('Location: ' . BASE_URL . '/index.php');
                 exit;
             } else {
-                $safeIp = $conn->real_escape_string($ip);
-                $conn->query("INSERT INTO login_attempts (ip_address, attempt_count, first_attempt) VALUES ('$safeIp', 1, " . time() . ") ON DUPLICATE KEY UPDATE attempt_count = attempt_count + 1");
+                // Track failed login attempt
+                $now = time();
+                $stmtRate = $conn->prepare("INSERT INTO login_attempts (ip_address, attempt_count, first_attempt) VALUES (?, 1, ?) ON DUPLICATE KEY UPDATE attempt_count = attempt_count + 1");
+                $stmtRate->bind_param("si", $ip, $now);
+                $stmtRate->execute();
                 $error = 'Invalid username or password.';
             }
         } else {

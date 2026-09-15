@@ -1,5 +1,5 @@
   </main>
 </div>
-<script src="/pos/js/main.js"></script>
+<script src="<?= BASE_URL ?>/js/main.js"></script>
 </body>
 </html>

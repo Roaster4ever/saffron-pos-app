@@ -162,7 +162,7 @@ include __DIR__ . '/../includes/header.php';
   </div>
 </div>
 
-<script src="<?= BASE_URL ?>/&#34;/js/jspdf.umd.min.js" defer></script>
+<script src="<?= BASE_URL ?>/js/jspdf.umd.min.js" defer></script>
 <script>
 const TAX_RATE  = <?= TAX_RATE ?>;
 const CURRENCY  = '<?= CURRENCY ?>';

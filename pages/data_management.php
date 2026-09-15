@@ -1,9 +1,10 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/auth.php';
-// windows_compat removed for Vercel
 requireLogin();
 if (!isAdmin()) { header('Location: ?error=Admin+access+required'); exit; }
+
+$isVercel = isVercel();
 
 // ════════════════════════════════════════════════════════
 // POST HANDLERS
@@ -714,6 +715,11 @@ $productCount = $conn->query("SELECT COUNT(*) c FROM products")->fetch_assoc()['
   <div class="card" style="margin-bottom:16px">
     <div class="card-header"><span class="card-title">Full Backup &amp; Restore</span></div>
     <div class="card-body">
+      <?php if ($isVercel): ?>
+      <div style="background:rgba(255,140,74,.1);border:1px solid rgba(255,140,74,.3);border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--orange)">
+        Running on Vercel (serverless). Backup/restore works via pure PHP (no shell commands). File upload limit may be lower than on a traditional server. For large databases, use your database provider's dashboard instead.
+      </div>
+      <?php endif; ?>
       <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Creates a complete database dump (<code>.sql.gz</code>) with all tables, data, and structure. Restore will replace the current database — a safety backup is created automatically.</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
         <form method="POST">

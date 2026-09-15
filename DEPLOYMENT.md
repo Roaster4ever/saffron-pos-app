@@ -69,10 +69,11 @@ export POS_DB_NAME=pos_db
 sudo mariadb -u root pos_db < /opt/pos/schema.sql
 ```
 
-> If you have existing migration files, run them in order:
+> This single file creates all 32 tables and default settings. No need to run migration files separately.
+>
+> For sample data (68 sanitary/plumbing products, 15 brands, 20 categories):
 > ```bash
-> sudo mariadb -u root pos_db < /opt/pos/migration_phase1.sql
-> sudo mariadb -u root pos_db < /opt/pos/seed_sanitary.sql  # optional
+> sudo mariadb -u root pos_db < /opt/pos/seed_sanitary.sql
 > ```
 
 ## Step 6: Configure Nginx
@@ -234,3 +235,54 @@ Or use the **Data & Backup** page in the admin panel (Admin only).
 | 503 errors | Check PHP-FPM is running: `systemctl status php8.1-fpm` |
 | Permission errors | `chown -R www-data:www-data /opt/pos` |
 | Session not persisting | Check PHP session config and `session.cookie_httponly` |
+
+---
+
+## Vercel Deployment (Serverless)
+
+### Prerequisites
+
+- GitHub account
+- Vercel account
+- MySQL-compatible database (PlanetScale, Neon, or similar)
+
+### Steps
+
+1. **Push to GitHub:**
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git remote add origin https://github.com/your-user/saffron-pos.git
+   git push -u origin main
+   ```
+
+2. **Connect to Vercel:**
+   - Go to [vercel.com/new](https://vercel.com/new)
+   - Import your GitHub repository
+   - Vercel will auto-detect PHP
+
+3. **Set Environment Variables:**
+   | Variable | Value |
+   |----------|-------|
+   | `POS_DB_HOST` | Your database host |
+   | `POS_DB_PORT` | `3306` |
+   | `POS_DB_USER` | Database username |
+   | `POS_DB_PASS` | Database password |
+   | `POS_DB_NAME` | `pos_db` |
+   | `POS_BASE_URL` | `/pos` or `/` |
+   | `POS_DB_SESSIONS` | `1` |
+
+4. **Deploy:**
+   - Click "Deploy"
+   - Wait for build to complete
+   - Visit the deployment URL
+   - Complete the setup wizard
+
+### Vercel Limitations
+
+- **File uploads:** 50MB max (Vercel function limit)
+- **Function duration:** 30 seconds max
+- **No shell commands:** Backup/restore uses pure PHP (no `mysqldump`)
+- **DB-backed sessions:** Required (no filesystem sessions)
+- **Rate limiting:** Uses database, not file system

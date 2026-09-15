@@ -1,6 +1,11 @@
 <?php
 // includes/config.php — Saffron POS Configuration
 
+// ── Detect runtime environment ──
+function isVercel() {
+    return getenv('VERCEL') === '1' || getenv('VERCEL');
+}
+
 // ── Base URL (configurable for Vercel vs local) ──
 define('BASE_URL', getenv('POS_BASE_URL') ?: '/pos');
 
@@ -8,14 +13,24 @@ define('BASE_URL', getenv('POS_BASE_URL') ?: '/pos');
 define('DB_HOST', getenv('POS_DB_HOST') ?: 'localhost');
 define('DB_PORT', getenv('POS_DB_PORT') ?: '3306');
 define('DB_USER', getenv('POS_DB_USER') ?: 'saffron_app');
-define('DB_PASS', getenv('POS_DB_PASS') ?: 'Bukh@r1P0s_2026!xK9');
+define('DB_PASS', getenv('POS_DB_PASS') ?: '');
 define('DB_NAME', getenv('POS_DB_NAME') ?: 'pos_db');
+
+// Validate credentials exist
+if (empty(DB_PASS)) {
+    http_response_code(500);
+    if (php_sapi_name() === 'cli') {
+        die("Database password not configured. Set POS_DB_PASS environment variable.\n");
+    } else {
+        die('<div style="font-family:sans-serif;padding:40px;background:#fee;color:#c00;border:2px solid #c00;margin:40px;border-radius:8px"><h2>Configuration Error</h2><p>Database password not configured. Set the <code>POS_DB_PASS</code> environment variable.</p></div>');
+    }
+}
 
 // ── Error handling ──
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
-if (getenv('VERCEL') || getenv('POS_DB_SESSIONS')) {
+if (isVercel() || getenv('POS_DB_SESSIONS')) {
     ini_set('error_log', 'php://stderr');
 } else {
     ini_set('error_log', '/var/log/pos_errors.log');
@@ -63,7 +78,7 @@ $conn->set_charset('utf8mb4');
 // ── DB-backed sessions for Vercel ──
 function initSession() {
     if (session_status() !== PHP_SESSION_NONE) return;
-    if (getenv('VERCEL') || getenv('POS_DB_SESSIONS')) {
+    if (isVercel() || getenv('POS_DB_SESSIONS')) {
         global $conn;
         session_set_save_handler(
             function($id) use ($conn) {

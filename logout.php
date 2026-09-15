@@ -5,6 +5,11 @@ if (isset($_SESSION['session_id']) && isset($conn)) {
     $stmt->bind_param("i", $_SESSION['session_id']);
     $stmt->execute();
 }
+$params = session_get_cookie_params();
+setcookie(session_name(), '', time() - 42000,
+    $params["path"], $params["domain"],
+    $params["secure"], $params["httponly"]
+);
 session_unset();
 session_destroy();
 header('Location: ' . BASE_URL . '/login.php');

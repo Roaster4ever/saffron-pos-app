@@ -1,6 +1,37 @@
+# Dependencies
 node_modules/
+vendor/
+
+# Vercel
 .vercel/
+
+# Build artifacts
 dist/
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Logs
 *.log
+
+# Environment (NEVER commit)
 .env
+.env.local
+.env.production
+
+# Backup files
+*.sql.gz
+*.sql.bak
+*.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Upload temp files
+/tmp/
+/uploads/
+/backups/
