@@ -7,7 +7,8 @@ function isVercel() {
 }
 
 // ── Base URL (configurable for Vercel vs local) ──
-define('BASE_URL', getenv('POS_BASE_URL') ?: '/pos');
+// On Vercel: app lives at root (empty string). On local server: /pos
+define('BASE_URL', getenv('POS_BASE_URL') ?: (isVercel() ? '' : '/pos'));
 
 // ── Production credentials (override via environment) ──
 define('DB_HOST', getenv('POS_DB_HOST') ?: 'localhost');

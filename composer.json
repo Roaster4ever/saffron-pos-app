@@ -1,15 +1,8 @@
 {
-  "name": "saffron/pos",
-  "description": "Saffron POS — Full-featured Point of Sale and business management system for Pakistan",
-  "type": "project",
-  "license": "UNLICENSED",
   "require": {
     "php": ">=8.1",
     "ext-mysqli": "*",
     "ext-json": "*",
     "ext-mbstring": "*"
-  },
-  "config": {
-    "optimize-autoloader": true
   }
 }
