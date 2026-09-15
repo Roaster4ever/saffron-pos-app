@@ -486,9 +486,16 @@ $pageTitle = 'Data & Backup';
 include __DIR__ . '/../includes/header.php';
 
 // Database stats for main page
-$dbSize = $conn->query("SELECT table_name, ROUND(data_length/1024/1024, 2) AS size_mb FROM information_schema.tables WHERE table_schema='pos_db' GROUP BY table_name ORDER BY data_length DESC")->fetch_all(MYSQLI_ASSOC);
-$totalSize = array_sum(array_column($dbSize, 'size_mb'));
-$tableCount = $conn->query("SELECT COUNT(*) c FROM information_schema.tables WHERE table_schema='pos_db'")->fetch_assoc()['c'];
+$isPg = $conn->is_pgsql();
+if ($isPg) {
+    $dbSize = $conn->query("SELECT tablename AS table_name, ROUND(pg_total_relation_size(schemaname||'.'||tablename)/1024.0/1024.0, 2) AS size_mb FROM pg_tables WHERE schemaname='public' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC")->fetch_all(MYSQLI_ASSOC);
+    $totalSize = array_sum(array_column($dbSize, 'size_mb'));
+    $tableCount = count($dbSize);
+} else {
+    $dbSize = $conn->query("SELECT table_name, ROUND(data_length/1024/1024, 2) AS size_mb FROM information_schema.tables WHERE table_schema='pos_db' GROUP BY table_name ORDER BY data_length DESC")->fetch_all(MYSQLI_ASSOC);
+    $totalSize = array_sum(array_column($dbSize, 'size_mb'));
+    $tableCount = $conn->query("SELECT COUNT(*) c FROM information_schema.tables WHERE table_schema='pos_db'")->fetch_assoc()['c'];
+}
 $lastSale = $conn->query("SELECT MAX(created_at) d FROM sales")->fetch_assoc()['d'] ?? 'Never';
 $productCount = $conn->query("SELECT COUNT(*) c FROM products")->fetch_assoc()['c'];
 ?>

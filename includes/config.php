@@ -10,12 +10,16 @@ function isVercel() {
 // On Vercel: app lives at root (empty string). On local server: /pos
 define('BASE_URL', getenv('POS_BASE_URL') ?: (isVercel() ? '' : '/pos'));
 
+require_once __DIR__ . '/db.php';
+
 // ── Production credentials (override via environment) ──
 define('DB_HOST', getenv('POS_DB_HOST') ?: 'localhost');
-define('DB_PORT', getenv('POS_DB_PORT') ?: '3306');
-define('DB_USER', getenv('POS_DB_USER') ?: 'saffron_app');
+define('DB_PORT', getenv('POS_DB_PORT') ?: '5432');
+define('DB_USER', getenv('POS_DB_USER') ?: '');
 define('DB_PASS', getenv('POS_DB_PASS') ?: '');
-define('DB_NAME', getenv('POS_DB_NAME') ?: 'pos_db');
+define('DB_NAME', getenv('POS_DB_NAME') ?: 'saffron');
+// Also support Vercel/Neon POSTGRES_URL
+define('DB_DSN', getenv('POSTGRES_URL') ?: getenv('DATABASE_URL') ?: '');
 
 // Validate credentials exist
 if (empty(DB_PASS)) {
@@ -59,11 +63,28 @@ set_error_handler(function ($errno, $errstr, $errfile, $errline) {
 });
 
 // ── Database connection ──
-$DB_PORT_INT = (int)DB_PORT;
-if (DB_HOST === 'localhost' || DB_HOST === '127.0.0.1') {
-    $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+// Support Neon/Vercel POSTGRES_URL (full connection string)
+if (DB_DSN && strpos(DB_DSN, 'postgresql') === 0) {
+    // Parse Neon connection string: postgresql://user:pass@host/db?sslmode=require
+    $parsed = parse_url(DB_DSN);
+    $conn = new Db(
+        $parsed['host'],
+        $parsed['user'],
+        $parsed['pass'],
+        ltrim($parsed['path'], '/'),
+        $parsed['port'] ?? 5432
+    );
+} elseif (DB_DSN && strpos(DB_DSN, 'mysql') === 0) {
+    $parsed = parse_url(DB_DSN);
+    $conn = new Db(
+        $parsed['host'],
+        $parsed['user'],
+        $parsed['pass'],
+        ltrim($parsed['path'], '/'),
+        $parsed['port'] ?? 3306
+    );
 } else {
-    $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, $DB_PORT_INT);
+    $conn = new Db(DB_HOST, DB_USER, DB_PASS, DB_NAME, (int)DB_PORT);
 }
 if ($conn->connect_error) {
     error_log('POS DB CONNECTION FAILED: ' . $conn->connect_error);
@@ -379,27 +400,45 @@ function csvEscape($value) {
 
 // ── Pure PHP Backup (no exec needed) ──
 function generateSqlDump($conn) {
+    $isPg = $conn->is_pgsql();
     $tables = [];
-    $result = $conn->query("SHOW TABLES");
+    $result = $conn->query($isPg
+        ? "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name"
+        : "SHOW TABLES"
+    );
     while ($row = $result->fetch_row()) $tables[] = $row[0];
-    $output = "-- Saffron POS Database Backup\n-- Generated: " . date('Y-m-d H:i:s') . "\n\nSET FOREIGN_KEY_CHECKS=0;\n\n";
+    $output = "-- Saffron POS Database Backup\n-- Generated: " . date('Y-m-d H:i:s') . "\n\n";
     foreach ($tables as $table) {
-        $create = $conn->query("SHOW CREATE TABLE `{$table}`");
-        if ($create && $row = $create->fetch_row()) $output .= "DROP TABLE IF EXISTS `{$table}`;\n{$row[1]};\n\n";
-        $data = $conn->query("SELECT * FROM `{$table}`");
+        $output .= "DROP TABLE IF EXISTS \"{$table}\" CASCADE;\n\n";
+        if ($isPg) {
+            // PostgreSQL: get CREATE TABLE from pg_dump-like output
+            $cols = $conn->query("SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = '{$table}' ORDER BY ordinal_position");
+            $output .= "CREATE TABLE \"{$table}\" (\n";
+            $colDefs = [];
+            while ($col = $cols->fetch_assoc()) {
+                $null = $col['is_nullable'] === 'YES' ? '' : ' NOT NULL';
+                $def = $col['column_default'] ? " DEFAULT {$col['column_default']}" : '';
+                $colDefs[] = "    \"{$col['column_name']}\" {$col['data_type']}{$null}{$def}";
+            }
+            $output .= implode(",\n", $colDefs) . "\n);\n\n";
+        } else {
+            $create = $conn->query("SHOW CREATE TABLE `{$table}`");
+            if ($create && $row = $create->fetch_row()) $output .= "{$row[1]};\n\n";
+        }
+        $data = $conn->query("SELECT * FROM \"{$table}\"");
         if ($data && $data->num_rows > 0) {
             while ($row = $data->fetch_assoc()) {
                 $vals = array_map(function($v) use ($conn) {
                     if ($v === null) return 'NULL';
+                    if ($conn->is_pgsql()) return $conn->pdo->quote($v);
                     return "'" . $conn->real_escape_string($v) . "'";
                 }, array_values($row));
-                $cols = array_map(function($c) { return "`{$c}`"; }, array_keys($row));
-                $output .= "INSERT INTO `{$table}` (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $vals) . ");\n";
+                $cols = array_map(function($c) { return "\"{$c}\""; }, array_keys($row));
+                $output .= "INSERT INTO \"{$table}\" (" . implode(', ', $cols) . ") VALUES (" . implode(', ', $vals) . ");\n";
             }
             $output .= "\n";
         }
     }
-    $output .= "SET FOREIGN_KEY_CHECKS=1;\n";
     return $output;
 }
 
