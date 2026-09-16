@@ -115,8 +115,8 @@ include __DIR__ . '/../includes/header.php';
 <?php endif; ?>
 
 <!-- Expenses table -->
-<div class="table-card">
-  <table>
+<div class="table-card" style="overflow-x:auto">
+  <table style="min-width:700px">
     <thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Note</th><th>User</th><th>Actions</th></tr></thead>
     <tbody>
     <?php if ($expenses): foreach ($expenses as $e): ?>
