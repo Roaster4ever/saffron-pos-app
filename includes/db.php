@@ -25,7 +25,8 @@ class Db {
                 $this->pdo = new PDO($dsn, $user, $pass, [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
+                    // 1002 = MYSQL_ATTR_INIT_COMMAND (avoids deprecation on PHP 8.5)
+                    1002 => "SET NAMES utf8mb4",
                 ]);
             }
         } catch (PDOException $e) {
