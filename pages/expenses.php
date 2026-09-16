@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+header('Cache-Control: no-store, no-cache, must-revalidate');
 $pageTitle = 'Expenses';
 $activePage = 'expenses';
 
