@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ?msg=Expense+added'); exit;
     }
 
-    if ($act === 'delete' && isAdmin()) {
+    if ($act === 'delete') {
         $id = intval($_POST['id']);
         $stmt = $conn->prepare("DELETE FROM expenses WHERE id=?");
         $stmt->bind_param("i", $id);
@@ -128,13 +128,11 @@ include __DIR__ . '/../includes/header.php';
         <td class="text-muted" style="font-size:12px"><?= e($e['note'] ?? '—') ?></td>
         <td class="text-muted" style="font-size:12px"><?= e($e['user_name'] ?? '—') ?></td>
         <td>
-          <?php if (isAdmin()): ?>
-          <form method="POST" style="display:inline" onsubmit="return confirmDelete()">
+          <form method="POST" style="display:inline" onsubmit="return confirmDelete('Delete expense <?= e(addslashes($e['title'])) ?>?')">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= $e['id'] ?>">
-            <button class="btn btn-danger btn-sm">Del</button>
+            <button class="btn btn-danger btn-sm">Delete</button>
           </form>
-          <?php endif; ?>
         </td>
       </tr>
     <?php endforeach; else: ?>
