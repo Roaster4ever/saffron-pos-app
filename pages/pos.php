@@ -6,11 +6,11 @@ requireLogin();
 $pageTitle  = 'Point of Sale';
 $activePage = 'pos';
 
-$categories = $conn->query("SELECT * FROM categories ORDER BY name")->fetch_all(MYSQLI_ASSOC);
-$products   = $conn->query("SELECT p.*, c.name cat_name, b.name brand_name, u.short_name unit_name, u.allows_decimal FROM products p LEFT JOIN categories c ON p.category_id=c.id LEFT JOIN brands b ON p.brand_id=b.id LEFT JOIN units u ON p.unit_id=u.id WHERE p.is_active=1 ORDER BY p.name")->fetch_all(MYSQLI_ASSOC);
-
 // Fetch customers for dropdown
 $customers = $conn->query("SELECT id, name, type, credit_limit FROM customers_v2 WHERE is_active=1 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+
+// Fetch drafts
+$drafts = $conn->query("SELECT id, draft_no, customer_name, total, item_count, created_at FROM pos_drafts WHERE user_id={$_SESSION['user_id']} ORDER BY created_at DESC LIMIT 10")->fetch_all(MYSQLI_ASSOC);
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -40,57 +40,27 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- POS LAYOUT -->
-<div class="pos-layout">
+<div class="pos-layout" style="grid-template-columns:1fr 420px">
 
-  <!-- LEFT: Products -->
-  <div class="pos-panel">
-    <div class="pos-search-bar" style="display:flex;gap:8px;align-items:center">
-      <input type="text" id="posSearch" class="pos-search" style="flex:1" placeholder="Search product, SKU, brand, barcode + Enter">
+  <!-- LEFT: Cart List (receipt history after checkout) -->
+  <div class="pos-panel" id="receiptPanel">
+    <div class="pos-search-bar">
+      <div style="font-size:13px;font-weight:700;color:var(--text2)">Cart List</div>
+      <div style="font-size:11px;color:var(--text3)">Items appear here after checkout</div>
     </div>
-    <div class="cat-tabs">
-      <button class="cat-tab active" data-cat="all">All</button>
-      <?php foreach ($categories as $cat): ?>
-        <button class="cat-tab" data-cat="<?= $cat['id'] ?>"><?= e($cat['name']) ?></button>
-      <?php endforeach; ?>
-    </div>
-    <div class="products-grid" id="productsGrid">
-      <?php foreach ($products as $p): ?>
-        <div class="product-card <?= $p['stock'] <= 0 ? 'out-of-stock' : '' ?>"
-             data-id="<?= $p['id'] ?>"
-             data-name="<?= e($p['name']) ?>"
-             data-price="<?= $p['price'] ?>"
-             data-cost="<?= $p['cost'] ?>"
-             data-minprice="<?= $p['min_price'] ?>"
-             data-wholesale="<?= $p['wholesale_price'] ?>"
-             data-contractor="<?= $p['contractor_price'] ?>"
-             data-stock="<?= $p['stock'] ?>"
-             data-reserved="<?= $p['reserved_stock'] ?? 0 ?>"
-             data-cat="<?= $p['category_id'] ?>"
-             data-barcode="<?= e($p['barcode'] ?? '') ?>"
-             data-sku="<?= e($p['sku'] ?? '') ?>"
-             data-model="<?= e($p['model'] ?? '') ?>"
-             data-brand="<?= e($p['brand_name'] ?? '') ?>"
-             data-taxable="<?= $p['taxable'] ?>"
-             data-gstrate="<?= $p['gst_rate'] ?>"
-             data-taxmode="<?= $p['tax_mode'] ?? 'default' ?>"
-             data-unit="<?= e($p['unit_name'] ?? 'pc') ?>"
-             data-sellingmode="<?= $p['selling_mode'] ?? 'fixed' ?>"
-             data-stdlengths="<?= e($p['standard_lengths'] ?? '') ?>"
-             data-defaultqty="<?= $p['default_qty'] ?? '' ?>"
-             onclick="addToCart(this)">
-          <div class="prod-name"><?= e($p['name']) ?></div>
-          <div class="prod-brand"><?= e($p['brand_name'] ?? '') ?></div>
-          <div class="prod-price"><?= money($p['price']) ?><?= ($p['selling_mode'] ?? 'fixed') === 'measured' ? ' / ' . e($p['unit_name'] ?? '') : '' ?></div>
-          <div class="prod-stock <?= $p['stock'] <= 0 ? 'stock-out' : ($p['stock'] <= $p['low_stock_alert'] ? 'stock-low' : '') ?>">
-            Stock: <?= $p['stock'] ?> <?= e($p['unit_name'] ?? 'pc') ?>
-          </div>
-        </div>
-      <?php endforeach; ?>
+    <div class="cart-items" id="receiptItems">
+      <div class="empty-state"><div class="empty-icon">&#9723;</div>Empty — complete a sale to see items here</div>
     </div>
   </div>
 
-  <!-- RIGHT: Cart -->
-  <div class="pos-panel">
+  <!-- RIGHT: Checkout -->
+  <div class="pos-panel" style="border-color:var(--accent);border-width:1px">
+    <!-- Search Bar -->
+    <div class="pos-search-bar" style="display:flex;gap:8px;align-items:center">
+      <input type="text" id="posSearch" class="pos-search" style="flex:1" placeholder="Search product, SKU, barcode + Enter" autocomplete="off">
+      <div id="searchResults" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);max-height:300px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
+    </div>
+
     <!-- Sale Type / Customer Selection -->
     <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
       <div style="display:flex;gap:6px;margin-bottom:8px">
@@ -154,10 +124,25 @@ include __DIR__ . '/../includes/header.php';
           Change: <strong id="changeAmt" class="text-accent"><?= CURRENCY ?>0.00</strong>
         </span>
       </div>
-      <div class="cart-actions">
+      <div class="cart-actions" style="gap:6px">
         <button class="btn-checkout" id="checkoutBtn" onclick="submitSale()">Checkout</button>
+        <button class="btn btn-secondary btn-sm" id="draftBtn" onclick="saveDraft()" style="padding:8px 14px;font-size:12px">Save Draft</button>
         <button class="btn-clear-cart" onclick="clearCart()" title="Clear cart">X</button>
       </div>
+      <!-- Draft Retrieval -->
+      <?php if (!empty($drafts)): ?>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">Saved Drafts</div>
+        <div style="display:flex;flex-direction:column;gap:4px;max-height:120px;overflow-y:auto">
+          <?php foreach ($drafts as $d): ?>
+            <button class="btn btn-secondary btn-sm" style="display:flex;justify-content:space-between;font-size:11px;padding:5px 8px;text-align:left" onclick="loadDraft(<?= $d['id'] ?>)">
+              <span><?= e($d['draft_no']) ?> — <?= e($d['customer_name'] ?: 'Walk-in') ?></span>
+              <span style="color:var(--accent);font-family:var(--mono)"><?= money($d['total']) ?></span>
+            </button>
+          <?php endforeach; ?>
+        </div>
+      </div>
+      <?php endif; ?>
     </div>
   </div>
 </div>
@@ -194,6 +179,93 @@ function showScanToast(msg, ok) {
   t.style.opacity = '1';
   clearTimeout(t._h);
   t._h = setTimeout(() => { t.style.opacity = '0'; }, 2000);
+}
+
+/* ── AJAX SEARCH ── */
+var _searchTimeout = null;
+$id('posSearch').addEventListener('input', function() {
+  clearTimeout(_searchTimeout);
+  var q = this.value.trim();
+  if (q.length < 1) { $id('searchResults').style.display = 'none'; return; }
+  _searchTimeout = setTimeout(function() { ajaxSearch(q); }, 200);
+});
+
+$id('posSearch').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    var q = this.value.trim();
+    if (q.length >= 1) { handleScannedCode(q); this.value = ''; $id('searchResults').style.display = 'none'; }
+  }
+  if (e.key === 'Escape') { $id('searchResults').style.display = 'none'; }
+});
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#posSearch') && !e.target.closest('#searchResults')) {
+    $id('searchResults').style.display = 'none';
+  }
+});
+
+function ajaxSearch(q) {
+  fetch('<?= BASE_URL ?>/pages/pos_search.php?q=' + encodeURIComponent(q))
+    .then(function(r) { return r.json(); })
+    .then(function(results) {
+      if (!results.length) { $id('searchResults').innerHTML = '<div style="padding:12px;text-align:center;color:var(--text2);font-size:12px">No products found</div>'; $id('searchResults').style.display = 'block'; return; }
+      var html = results.map(function(p) {
+        var stock = p.stock - (p.reserved_stock || 0);
+        var disabled = stock <= 0;
+        return '<div onclick="' + (disabled ? '' : 'pickSearchResult(' + JSON.stringify(p).replace(/"/g, '&quot;') + ')') + '" ' +
+          'style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);cursor:' + (disabled ? 'default' : 'pointer') + ';opacity:' + (disabled ? '.4' : '1') + ';transition:background .1s" ' +
+          'onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">' +
+          '<div><div style="font-weight:600;font-size:13px">' + p.name + '</div>' +
+          '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + (p.brand_name || '') + ' &middot; Stock: ' + stock + ' ' + (p.unit_name || 'pc') + '</div></div>' +
+          '<div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--accent)">' + fmt(p.price) + '</div></div>';
+      }).join('');
+      $id('searchResults').innerHTML = html;
+      $id('searchResults').style.display = 'block';
+    });
+}
+
+function pickSearchResult(p) {
+  $id('searchResults').style.display = 'none';
+  $id('posSearch').value = '';
+  var stock = p.stock - (p.reserved_stock || 0);
+  if (stock <= 0) { showScanToast('Out of stock: ' + p.name, false); return; }
+  if (p.selling_mode === 'measured') {
+    // Measured product: create a temporary card-like object for the picker
+    _pendingMeasuredData = p;
+    openMeasurePickerData(p);
+    return;
+  }
+  addProductToCart(p);
+}
+
+function addProductToCart(p) {
+  var stock = p.stock - (p.reserved_stock || 0);
+  var unitPrice = parseFloat(p[priceLevel]) || parseFloat(p.price) || 0;
+  if (unitPrice <= 0) unitPrice = parseFloat(p.price) || 0;
+  var id = p.id;
+
+  if (cart[id]) {
+    if (cart[id].qty >= stock) { showScanToast('Max stock reached!', false); return; }
+    cart[id].qty++;
+  } else {
+    cart[id] = {
+      id: parseInt(id),
+      name: p.name,
+      price: unitPrice,
+      cost: parseFloat(p.cost) || 0,
+      minPrice: parseFloat(p.min_price) || 0,
+      qty: 1,
+      stock: stock,
+      unit: p.unit_name || 'pc',
+      tax_mode: p.tax_mode || 'default',
+      gst_rate: parseFloat(p.gst_rate) || 0,
+      taxable: parseInt(p.taxable) || 0,
+      selling_mode: p.selling_mode || 'fixed'
+    };
+  }
+  showScanToast('Added: ' + p.name, true);
+  renderCart();
 }
 
 /* ── SALE TYPE ── */
@@ -242,151 +314,14 @@ function setPriceLevel(level, btn) {
   priceLevel = level;
   document.querySelectorAll('[data-prl]').forEach(function(b) { b.classList.remove('active'); });
   btn.classList.add('active');
-  // Update cart prices
   Object.keys(cart).forEach(function(id) {
-    var card = document.querySelector('.product-card[data-id="' + id + '"]');
-    if (card) {
-      var newPrice = parseFloat(card.dataset[level]) || parseFloat(card.dataset.price) || 0;
-      if (newPrice > 0) cart[id].price = newPrice;
-    }
+    // Re-fetch price from search API cache or just keep current
   });
   renderCart();
 }
 
 /* ── CART ── */
-var _pendingMeasuredCard = null;
-
-function addToCart(el) {
-  if (el.classList.contains('out-of-stock')) return;
-  var sellingMode = el.dataset.sellingmode || 'fixed';
-
-  if (sellingMode === 'measured') {
-    // Open measurement picker for measured products
-    _pendingMeasuredCard = el;
-    openMeasurePicker(el);
-    return;
-  }
-
-  // Fixed product — original behavior
-  const id = el.dataset.id;
-  const stock = parseFloat(el.dataset.stock) - parseFloat(el.dataset.reserved || 0);
-  const unitPrice = parseFloat(el.dataset[priceLevel]) || parseFloat(el.dataset.price) || 0;
-
-  if (cart[id]) {
-    if (cart[id].qty >= stock) { showScanToast('Max stock reached!', false); return; }
-    cart[id].qty++;
-  } else {
-    cart[id] = {
-      id: parseInt(id),
-      name: el.dataset.name,
-      price: unitPrice,
-      cost: parseFloat(el.dataset.cost) || 0,
-      minPrice: parseFloat(el.dataset.minprice) || 0,
-      qty: 1,
-      stock: stock,
-      unit: el.dataset.unit || 'pc',
-      tax_mode: el.dataset.taxmode || 'default',
-      gst_rate: parseFloat(el.dataset.gstrate) || 0,
-      taxable: parseInt(el.dataset.taxable) || 0,
-      selling_mode: 'fixed'
-    };
-  }
-  renderCart();
-}
-
-function openMeasurePicker(el) {
-  var name = el.dataset.name;
-  var unit = el.dataset.unit || 'ft';
-  var stdLengths = (el.dataset.stdlengths || '').split('|').filter(Boolean);
-  var defaultQty = el.dataset.defaultqty || '';
-  var price = parseFloat(el.dataset[priceLevel]) || parseFloat(el.dataset.price) || 0;
-
-  document.getElementById('measureTitle').textContent = name;
-
-  var html = '<div style="margin-bottom:12px">';
-  html += '<div style="font-size:12px;color:var(--text2)">' + CURRENCY + fmt(price) + ' / ' + unit + '</div>';
-  html += '</div>';
-
-  if (stdLengths.length > 0) {
-    html += '<div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">Common Measurements</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">';
-    stdLengths.forEach(function(len) {
-      html += '<button class="btn btn-secondary btn-sm" onclick="selectMeasure(' + len + ')" style="min-width:60px">' + len + ' ' + unit + '</button>';
-    });
-    html += '</div>';
-  }
-
-  html += '<div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">Custom Quantity</div>';
-  html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">';
-  html += '<input type="number" id="measureQty" step="any" min="0.001" value="' + (defaultQty || '') + '" class="form-control" style="flex:1" placeholder="Enter quantity">';
-  html += '<span style="font-size:13px;color:var(--text2);font-weight:600">' + unit + '</span>';
-  html += '</div>';
-
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--border)">';
-  html += '<div style="font-size:12px;color:var(--text2)">Total:</div>';
-  html += '<div id="measureTotal" style="font-size:18px;font-weight:700;color:var(--accent)">' + CURRENCY + '0.00</div>';
-  html += '</div>';
-
-  html += '<button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="confirmMeasureAdd()">Add to Cart</button>';
-
-  document.getElementById('measureBody').innerHTML = html;
-
-  // Update total on input
-  var qtyInput = document.getElementById('measureQty');
-  qtyInput.addEventListener('input', function() {
-    var q = parseFloat(this.value) || 0;
-    document.getElementById('measureTotal').textContent = CURRENCY + fmt(q * price);
-  });
-  if (defaultQty) {
-    qtyInput.dispatchEvent(new Event('input'));
-  }
-
-  openModal('measureModal');
-  qtyInput.focus();
-}
-
-function selectMeasure(qty) {
-  document.getElementById('measureQty').value = qty;
-  document.getElementById('measureQty').dispatchEvent(new Event('input'));
-}
-
-function confirmMeasureAdd() {
-  var qty = parseFloat(document.getElementById('measureQty').value) || 0;
-  if (qty <= 0) { showScanToast('Enter a valid quantity', false); return; }
-  if (!_pendingMeasuredCard) return;
-
-  var el = _pendingMeasuredCard;
-  const id = el.dataset.id;
-  const stock = parseFloat(el.dataset.stock) - parseFloat(el.dataset.reserved || 0);
-  const unitPrice = parseFloat(el.dataset[priceLevel]) || parseFloat(el.dataset.price) || 0;
-
-  if (cart[id]) {
-    var newQty = cart[id].qty + qty;
-    if (newQty > stock) { showScanToast('Max stock reached! Available: ' + stock + ' ' + el.dataset.unit, false); return; }
-    cart[id].qty = parseFloat(newQty.toFixed(3));
-  } else {
-    if (qty > stock) { showScanToast('Max stock reached! Available: ' + stock + ' ' + el.dataset.unit, false); return; }
-    cart[id] = {
-      id: parseInt(id),
-      name: el.dataset.name,
-      price: unitPrice,
-      cost: parseFloat(el.dataset.cost) || 0,
-      minPrice: parseFloat(el.dataset.minprice) || 0,
-      qty: parseFloat(qty.toFixed(3)),
-      stock: stock,
-      unit: el.dataset.unit || 'ft',
-      tax_mode: el.dataset.taxmode || 'default',
-      gst_rate: parseFloat(el.dataset.gstrate) || 0,
-      taxable: parseInt(el.dataset.taxable) || 0,
-      selling_mode: 'measured'
-    };
-  }
-
-  closeModal('measureModal');
-  _pendingMeasuredCard = null;
-  showScanToast('Added: ' + el.dataset.name + ' (' + qty + ' ' + (el.dataset.unit || '') + ')', true);
-  renderCart();
-}
+var _pendingMeasuredData = null;
 
 function renderCart() {
   const keys = Object.keys(cart);
@@ -456,33 +391,81 @@ function togglePayment() {
   }
 }
 
-/* ── SEARCH ── */
-$id('posSearch').addEventListener('input', function() {
-  const q = this.value.toLowerCase();
-  document.querySelectorAll('.product-card').forEach(function(c) {
-    var match = c.dataset.name.toLowerCase().includes(q) ||
-                c.dataset.barcode.toLowerCase().includes(q) ||
-                (c.dataset.sku||'').toLowerCase().includes(q) ||
-                (c.dataset.model||'').toLowerCase().includes(q) ||
-                (c.dataset.brand||'').toLowerCase().includes(q);
-    c.style.display = match ? '' : 'none';
-  });
-});
+/* ── MEASURED PRODUCTS ── */
+function openMeasurePickerData(p) {
+  var name = p.name;
+  var unit = p.unit_name || 'ft';
+  var stdLengths = (p.standard_lengths || '').split('|').filter(Boolean);
+  var defaultQty = p.default_qty || '';
+  var price = parseFloat(p[priceLevel]) || parseFloat(p.price) || 0;
 
-document.querySelectorAll('.cat-tab:not([data-prl])').forEach(function(tab) {
-  tab.addEventListener('click', function() {
-    document.querySelectorAll('.cat-tab:not([data-prl])').forEach(function(t) { t.classList.remove('active'); });
-    tab.classList.add('active');
-    const cat = tab.dataset.cat;
-    document.querySelectorAll('.product-card').forEach(function(c) {
-      c.style.display = (cat === 'all' || c.dataset.cat == cat) ? '' : 'none';
+  document.getElementById('measureTitle').textContent = name;
+  var html = '<div style="margin-bottom:12px">';
+  html += '<div style="font-size:12px;color:var(--text2)">' + CURRENCY + fmt(price) + ' / ' + unit + '</div>';
+  html += '</div>';
+  if (stdLengths.length > 0) {
+    html += '<div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">Common Measurements</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">';
+    stdLengths.forEach(function(len) {
+      html += '<button class="btn btn-secondary btn-sm" onclick="selectMeasure(' + len + ')" style="min-width:60px">' + len + ' ' + unit + '</button>';
     });
+    html += '</div>';
+  }
+  html += '<div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">Custom Quantity</div>';
+  html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">';
+  html += '<input type="number" id="measureQty" step="any" min="0.001" value="' + (defaultQty || '') + '" class="form-control" style="flex:1" placeholder="Enter quantity">';
+  html += '<span style="font-size:13px;color:var(--text2);font-weight:600">' + unit + '</span>';
+  html += '</div>';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--border)">';
+  html += '<div style="font-size:12px;color:var(--text2)">Total:</div>';
+  html += '<div id="measureTotal" style="font-size:18px;font-weight:700;color:var(--accent)">' + CURRENCY + '0.00</div>';
+  html += '</div>';
+  html += '<button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="confirmMeasureAddData()">Add to Cart</button>';
+  document.getElementById('measureBody').innerHTML = html;
+  var qtyInput = document.getElementById('measureQty');
+  qtyInput.addEventListener('input', function() {
+    var q = parseFloat(this.value) || 0;
+    document.getElementById('measureTotal').textContent = CURRENCY + fmt(q * price);
   });
-});
+  if (defaultQty) qtyInput.dispatchEvent(new Event('input'));
+  openModal('measureModal');
+  qtyInput.focus();
+}
 
-/* Keyboard scanner */
+function confirmMeasureAddData() {
+  var qty = parseFloat(document.getElementById('measureQty').value) || 0;
+  if (qty <= 0) { showScanToast('Enter a valid quantity', false); return; }
+  if (!_pendingMeasuredData) return;
+  var p = _pendingMeasuredData;
+  var stock = p.stock - (p.reserved_stock || 0);
+  if (qty > stock) { showScanToast('Max stock reached! Available: ' + stock, false); return; }
+  var unitPrice = parseFloat(p[priceLevel]) || parseFloat(p.price) || 0;
+  var id = p.id;
+  if (cart[id]) {
+    cart[id].qty = parseFloat((cart[id].qty + qty).toFixed(3));
+  } else {
+    cart[id] = {
+      id: parseInt(id), name: p.name, price: unitPrice, cost: parseFloat(p.cost) || 0,
+      minPrice: parseFloat(p.min_price) || 0, qty: parseFloat(qty.toFixed(3)), stock: stock,
+      unit: p.unit_name || 'ft', tax_mode: p.tax_mode || 'default', gst_rate: parseFloat(p.gst_rate) || 0,
+      taxable: parseInt(p.taxable) || 0, selling_mode: 'measured'
+    };
+  }
+  closeModal('measureModal');
+  _pendingMeasuredData = null;
+  showScanToast('Added: ' + p.name + ' (' + qty + ' ' + (p.unit_name || '') + ')', true);
+  renderCart();
+}
+
+function selectMeasure(qty) {
+  document.getElementById('measureQty').value = qty;
+  document.getElementById('measureQty').dispatchEvent(new Event('input'));
+}
+
+/* ── BARCODE / KEYBOARD SCANNER ── */
 var _buf = '', _lastKey = 0;
 document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
   var now = Date.now(), gap = now - _lastKey; _lastKey = now;
   if (gap > 300) _buf = '';
   if (e.key === 'Enter') {
@@ -493,83 +476,87 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-$id('posSearch').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    var code = this.value.trim();
-    if (code.length >= 3) { handleScannedCode(code); this.value = ''; e.preventDefault(); }
-  }
-});
-
-/* ── BARCODE MATCHING ── */
 function handleScannedCode(code) {
   code = code.trim();
   if (!code) return;
-  var cards = Array.from(document.querySelectorAll('.product-card'));
-  var matches = cards.filter(function(c) {
-    return c.dataset.barcode.trim().toLowerCase() === code.toLowerCase() ||
-           (c.dataset.sku||'').toLowerCase() === code.toLowerCase();
-  });
-
-  if (matches.length === 0) {
-    showScanToast('Not found: ' + code, false);
-  } else if (matches.length === 1) {
-    addMatchedProduct(matches[0]);
-  } else {
-    showBarcodePicker(matches, code);
-  }
+  fetch('<?= BASE_URL ?>/pages/pos_search.php?q=' + encodeURIComponent(code))
+    .then(function(r) { return r.json(); })
+    .then(function(results) {
+      if (!results.length) { showScanToast('Not found: ' + code, false); return; }
+      // Filter exact barcode/sku matches first
+      var exact = results.filter(function(p) {
+        return (p.barcode || '').toLowerCase() === code.toLowerCase() || (p.sku || '').toLowerCase() === code.toLowerCase();
+      });
+      var match = exact.length ? exact[0] : results[0];
+      var stock = match.stock - (match.reserved_stock || 0);
+      if (stock <= 0) { showScanToast('Out of stock: ' + match.name, false); return; }
+      if (match.selling_mode === 'measured') {
+        _pendingMeasuredData = match;
+        openMeasurePickerData(match);
+      } else {
+        addProductToCart(match);
+      }
+    });
 }
 
-function addMatchedProduct(card) {
-  if (card.classList.contains('out-of-stock')) {
-    showScanToast('Out of stock: ' + card.dataset.name, false);
-  } else if (card.dataset.sellingmode === 'measured') {
-    // Measured product: open picker instead of adding 1
-    _pendingMeasuredCard = card;
-    openMeasurePicker(card);
-  } else {
-    addToCart(card);
-    showScanToast('Added: ' + card.dataset.name, true);
-    card.style.transition = 'transform .15s,border-color .2s';
-    card.style.transform = 'scale(1.06)';
-    card.style.borderColor = '#3aff8a';
-    setTimeout(function() {
-      card.style.transform = ''; card.style.borderColor = '';
-    }, 500);
-  }
+/* ── DRAFTS ── */
+function saveDraft() {
+  if (!Object.keys(cart).length) { alert('Cart is empty!'); return; }
+  var fd = new FormData();
+  fd.append('csrf_token', CSRF_TOKEN);
+  fd.append('action', 'save_draft');
+  fd.append('cart', JSON.stringify(Object.values(cart)));
+  fd.append('discount', $id('discountInput').value || '0');
+  fd.append('customer_id', selectedCustomer ? selectedCustomer.id : '');
+  fd.append('payment_method', $id('paymentMethod').value);
+
+  fetch('<?= BASE_URL ?>/pages/pos_draft.php', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) { showScanToast('Draft saved: ' + data.draft_no, true); clearCart(); setTimeout(function() { location.reload(); }, 800); }
+      else alert('Error: ' + data.error);
+    })
+    .catch(function() { alert('Network error.'); });
 }
 
-function showBarcodePicker(cards, code) {
-  var html = cards.map(function(card, i) {
-    var inStock = !card.classList.contains('out-of-stock');
-    return '<div onclick="' + (inStock ? 'pickProduct(' + i + ')' : '') + '" ' +
-      'style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--border2);border-radius:4px;margin-bottom:8px;background:var(--bg3);cursor:' + (inStock ? 'pointer' : 'default') + ';opacity:' + (inStock ? '1' : '.4') + '">' +
-      '<div><div style="font-weight:600;font-size:13px">' + card.dataset.name + '</div>' +
-      '<div style="font-size:11px;color:var(--text2);margin-top:2px">Stock: ' + card.dataset.stock + '</div></div>' +
-      '<div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--accent)">' + fmt(parseFloat(card.dataset.price)) + '</div></div>';
-  }).join('');
-  document.getElementById('pickerList').innerHTML = html;
-  document.getElementById('pickerBarcode').textContent = code;
-  window._pickerCards = cards;
-  document.getElementById('barcodePicker').classList.add('open');
+function loadDraft(id) {
+  fetch('<?= BASE_URL ?>/pages/pos_draft.php?id=' + id)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.success) { alert(data.error || 'Draft not found'); return; }
+      cart = {};
+      data.items.forEach(function(item) {
+        cart[item.product_id] = {
+          id: item.product_id, name: item.product_name, price: parseFloat(item.price),
+          cost: parseFloat(item.cost) || 0, minPrice: 0, qty: parseFloat(item.qty),
+          stock: 99999, unit: item.unit || 'pc', tax_mode: item.tax_mode || 'default',
+          gst_rate: parseFloat(item.gst_rate) || 0, taxable: parseInt(item.taxable) || 0,
+          selling_mode: item.selling_mode || 'fixed'
+        };
+      });
+      $id('discountInput').value = data.discount || 0;
+      if (data.customer_id) {
+        $id('customerId').value = data.customer_id;
+        setSaleType('customer');
+        onCustomerChange();
+      }
+      renderCart();
+      showScanToast('Draft loaded: ' + data.draft_no, true);
+      // Delete the draft
+      fetch('<?= BASE_URL ?>/pages/pos_draft.php', { method: 'POST', body: (function(){ var f = new FormData(); f.append('csrf_token', CSRF_TOKEN); f.append('action','delete_draft'); f.append('id', id); return f; })() });
+      setTimeout(function() { location.reload(); }, 1000);
+    });
 }
-
-function pickProduct(i) {
-  document.getElementById('barcodePicker').classList.remove('open');
-  if (window._pickerCards[i]) addMatchedProduct(window._pickerCards[i]);
-}
-
-function closePicker() { document.getElementById('barcodePicker').classList.remove('open'); }
 
 /* ── AJAX CHECKOUT ── */
 function submitSale() {
-  if (submitSale._processing) return; // Double-submit guard
+  if (submitSale._processing) return;
   if (!Object.keys(cart).length) { alert('Cart is empty!'); return; }
 
   var pm = $id('paymentMethod').value;
   var total = parseFloat($id('cartTotal').textContent.replace(CURRENCY, '')) || 0;
   var paid = parseFloat($id('paidInput').value) || 0;
 
-  // Validate min price (client-side warning, server blocks)
   for (var id in cart) {
     if (cart[id].minPrice > 0 && cart[id].price < cart[id].minPrice) {
       if (!confirm('Price for "' + cart[id].name + '" (' + fmt(cart[id].price) + ') is below minimum (' + fmt(cart[id].minPrice) + '). Continue?')) {
@@ -598,10 +585,42 @@ function submitSale() {
     .then(function(data) {
       submitSale._processing = false;
       btn.textContent = 'Checkout'; btn.disabled = false;
-      if (data.success) { lastSale = data; clearCart(); showInvoice(data); }
+      if (data.success) {
+        lastSale = data;
+        addToReceiptList(data);
+        clearCart();
+        showInvoice(data);
+      }
       else alert('Error: ' + data.error);
     })
     .catch(function() { submitSale._processing = false; btn.textContent = 'Checkout'; btn.disabled = false; alert('Network error. Try again.'); });
+}
+
+/* ── RECEIPT LIST ── */
+var _receiptItems = [];
+function addToReceiptList(s) {
+  _receiptItems.push(s);
+  renderReceiptList();
+}
+
+function renderReceiptList() {
+  if (!_receiptItems.length) return;
+  var html = _receiptItems.map(function(s, idx) {
+    var items = s.items.map(function(i) {
+      return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;border-bottom:1px solid var(--border)">' +
+        '<span style="color:var(--text)">' + i.name + ' &times; ' + i.qty + '</span>' +
+        '<span style="font-family:var(--mono);color:var(--accent)">' + fmt(i.total) + '</span></div>';
+    }).join('');
+    return '<div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border)">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">' +
+        '<span style="font-weight:700;font-family:var(--mono);font-size:12px">' + s.invoice_no + '</span>' +
+        '<span style="font-size:11px;color:var(--text3)">' + s.date + '</span></div>' +
+      '<div style="font-size:11px;color:var(--text2);margin-bottom:6px">' + (s.customer_name || 'Walk-in') + ' &middot; ' + s.payment_method + '</div>' +
+      items +
+      '<div style="text-align:right;margin-top:6px;font-weight:800;font-size:14px;color:var(--accent)">' + fmt(s.total) + '</div>' +
+    '</div>';
+  }).join('');
+  $id('receiptItems').innerHTML = html;
 }
 
 /* ── INVOICE ── */
@@ -728,26 +747,27 @@ function downloadPDF() {
 <script>
 /* ── Keyboard Shortcuts ── */
 document.addEventListener('keydown', function(e) {
-  // Don't trigger when typing in inputs
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-
   switch(e.key) {
     case '/':
     case 'F2':
       e.preventDefault();
-      var sb = document.getElementById('searchBox');
+      var sb = document.getElementById('posSearch');
       if (sb) { sb.focus(); sb.select(); }
       break;
     case 'F5':
       e.preventDefault();
       clearCart();
       break;
+    case 'F8':
+      e.preventDefault();
+      saveDraft();
+      break;
     case 'F9':
       e.preventDefault();
       submitSale();
       break;
     case 'Escape':
-      // Close any open modal
       document.querySelectorAll('.modal-overlay.open').forEach(function(m) { m.classList.remove('open'); });
       break;
   }
