@@ -57,6 +57,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'refun
             if ($sale['customer_v2_id'] && floatval($sale['outstanding'] ?? 0) > 0 && $totalRefund > 0) {
                 $adjustAmt = min($totalRefund, floatval($sale['outstanding']));
                 updateCustomerBalance($conn, $sale['customer_v2_id'], 'refund', $adjustAmt, 'sale', $id, "Partial refund - Invoice {$sale['invoice_no']}");
+
+                // Record refund in customer_payments
+                $payStmt = $conn->prepare("INSERT INTO customer_payments (customer_id, amount, payment_method, reference_no, note, user_id) VALUES (?, ?, 'refund', ?, ?, ?)");
+                $refundRef = "REF-" . $sale['invoice_no'];
+                $refundNote = "Refund for Invoice {$sale['invoice_no']}";
+                $payStmt->bind_param("dsssi", $sale['customer_v2_id'], $adjustAmt, $refundRef, $refundNote, $uid);
+                $payStmt->execute();
             }
 
             auditLog($conn, 'sale_partial_refund', 'sale', $id, [
@@ -86,6 +93,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'refun
             // Reverse ledger entry if credit sale
             if ($sale['customer_v2_id'] && floatval($sale['outstanding'] ?? 0) > 0) {
                 updateCustomerBalance($conn, $sale['customer_v2_id'], 'refund', floatval($sale['outstanding']), 'sale', $id, "Full refund - Invoice {$sale['invoice_no']}");
+
+                // Record refund in customer_payments
+                $payStmt = $conn->prepare("INSERT INTO customer_payments (customer_id, amount, payment_method, reference_no, note, user_id) VALUES (?, ?, 'refund', ?, ?, ?)");
+                $refundRef = "REF-" . $sale['invoice_no'];
+                $refundNote = "Full refund - Invoice {$sale['invoice_no']}";
+                $payStmt->bind_param("dsssi", $sale['customer_v2_id'], $sale['outstanding'], $refundRef, $refundNote, $uid);
+                $payStmt->execute();
             }
 
             auditLog($conn, 'sale_refund', 'sale', $id, ['invoice_no' => $sale['invoice_no']]);

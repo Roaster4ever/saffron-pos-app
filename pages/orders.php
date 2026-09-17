@@ -78,6 +78,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute();
         header('Location: ?msg=Order+cancelled'); exit;
     }
+
+    if ($act === 'edit_order') {
+        $oid = intval($_POST['order_id']);
+        // Only edit pending orders
+        $stmt = $conn->prepare("SELECT * FROM orders WHERE id=? AND status='pending'");
+        $stmt->bind_param("i", $oid);
+        $stmt->execute();
+        $ord = $stmt->get_result()->fetch_assoc();
+        if (!$ord) { header('Location: ?error=Order+not+editable'); exit; }
+
+        $note = trim($_POST['note'] ?? '');
+        $items = json_decode($_POST['items'] ?? '[]', true);
+
+        if (empty($items)) { header('Location: ?error=No+items'); exit; }
+
+        $conn->begin_transaction();
+        try {
+            // Update order note
+            $stmt2 = $conn->prepare("UPDATE orders SET note=? WHERE id=?");
+            $stmt2->bind_param("si", $note, $oid);
+            $stmt2->execute();
+
+            // Delete old items
+            $stmt3 = $conn->prepare("DELETE FROM order_items WHERE order_id=?");
+            $stmt3->bind_param("i", $oid);
+            $stmt3->execute();
+
+            // Insert new items
+            $total = 0;
+            foreach ($items as $item) {
+                $pid   = intval($item['product_id']);
+                $pname = $item['product_name'];
+                $qty   = floatval($item['qty']);
+                $cost  = floatval($item['cost']);
+                $itot  = $qty * $cost;
+                $total += $itot;
+                $stmt4 = $conn->prepare("INSERT INTO order_items (order_id,product_id,product_name,qty,cost,total) VALUES (?,?,?,?,?,?)");
+                $stmt4->bind_param("iisidd", $oid, $pid, $pname, $qty, $cost, $itot);
+                $stmt4->execute();
+            }
+
+            // Update total
+            $stmt5 = $conn->prepare("UPDATE orders SET total=? WHERE id=?");
+            $stmt5->bind_param("di", $total, $oid);
+            $stmt5->execute();
+
+            auditLog($conn, 'order_update', 'order', $oid, ['order_no' => $ord['order_no'], 'total' => $total]);
+            $conn->commit();
+            header('Location: ?msg=Order+updated'); exit;
+        } catch (Exception $ex) {
+            $conn->rollback();
+            error_log('ORDER EDIT ERROR: ' . $ex->getMessage());
+            header('Location: ?error=Order+update+failed'); exit;
+        }
+    }
 }
 
 $pageTitle  = 'Orders';
@@ -128,6 +183,7 @@ include __DIR__ . '/../includes/header.php';
         <td>
           <button class="btn btn-secondary btn-sm" onclick="viewOrder(<?= $o['id'] ?>)">View</button>
           <?php if ($o['status'] === 'pending'): ?>
+            <button class="btn btn-secondary btn-sm" onclick="editOrder(<?= $o['id'] ?>)">Edit</button>
             <form method="POST" style="display:inline" onsubmit="return confirm('Mark as received? This will update stock.')">
               <?= csrf_field() ?>
               <input type="hidden" name="action" value="receive">
@@ -226,6 +282,63 @@ include __DIR__ . '/../includes/header.php';
   </div>
 </div>
 
+<!-- Edit Order Modal -->
+<div class="modal-overlay" id="editOrderModal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header"><span class="modal-title">Edit Purchase Order</span><span class="modal-close" onclick="closeModal('editOrderModal')">&times;</span></div>
+    <form method="POST" onsubmit="return prepareEditOrder()">
+      <div class="modal-body">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="edit_order">
+        <input type="hidden" name="order_id" id="editOrderId">
+        <input type="hidden" name="items" id="editOrderItemsJson">
+        <div class="form-group">
+          <label>Note</label>
+          <input name="note" id="editOrderNote" class="form-control" placeholder="Optional note">
+        </div>
+
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px">
+          <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Add Items</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group" style="flex:2;min-width:160px">
+              <label>Product</label>
+              <select id="eoProduct" class="form-control" onchange="fillEditCost()">
+                <option value="">— Select —</option>
+                <?php foreach ($products as $p): ?>
+                  <option value="<?= $p['id'] ?>" data-name="<?= e($p['name']) ?>" data-cost="<?= $p['cost'] ?>"><?= e($p['name']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1;min-width:80px">
+              <label>Qty</label>
+              <input type="number" id="eoQty" min="1" value="1" class="form-control">
+            </div>
+            <div class="form-group" style="flex:1;min-width:100px">
+              <label>Cost/Unit</label>
+              <input type="number" id="eoCost" step="0.01" min="0" value="0" class="form-control">
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" style="margin-bottom:1px" onclick="addEditOrderItem()">Add</button>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <table>
+            <thead><tr><th>Product</th><th>Qty</th><th>Cost</th><th>Total</th><th></th></tr></thead>
+            <tbody id="editOrderItemsBody"><tr><td colspan="5" class="empty-state" style="padding:20px">No items added yet</td></tr></tbody>
+          </table>
+        </div>
+        <div style="text-align:right;margin-top:10px;font-size:15px;font-weight:700">
+          Order Total: <span id="editOrderTotal" class="text-accent text-mono"><?= CURRENCY ?>0.00</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('editOrderModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Update Order</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 var CURRENCY    = '<?= CURRENCY ?>';
 var orderItems  = [];
@@ -277,6 +390,80 @@ function viewOrder(id) {
   document.getElementById('orderDetailBody').innerHTML = '<div class="empty-state">Loading...</div>';
   openModal('orderDetailModal');
   fetch('<?= BASE_URL ?>/pages/order_detail.php?id=' + id).then(function(r){ return r.text(); }).then(function(h){ document.getElementById('orderDetailBody').innerHTML = h; });
+}
+
+/* ── Edit Order ── */
+var editOrderItems = [];
+
+function editOrder(id) {
+  editOrderItems = [];
+  fetch('<?= BASE_URL ?>/pages/order_detail.php?id=' + id)
+    .then(function(r){ return r.text(); })
+    .then(function(html) {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+      var rows = doc.querySelectorAll('tbody tr');
+      rows.forEach(function(row) {
+        var cells = row.querySelectorAll('td');
+        if (cells.length >= 3) {
+          var name = cells[0].textContent.trim();
+          var qty = parseFloat(cells[1].textContent.trim()) || 0;
+          var cost = parseFloat(cells[2].textContent.replace(/[^\d.]/g, '')) || 0;
+          var pid = row.getAttribute('data-product-id') || 0;
+          if (qty > 0 && name) {
+            editOrderItems.push({ product_id: parseInt(pid), product_name: name, qty: qty, cost: cost, total: qty * cost });
+          }
+        }
+      });
+      // Try to find order note and id from the detail HTML
+      var noteMatch = html.match(/Note:<\/span>\s*([^<]+)/);
+      var idMatch = html.match(/Order #/);
+      document.getElementById('editOrderId').value = id;
+      document.getElementById('editOrderNote').value = noteMatch ? noteMatch[1].trim() : '';
+      renderEditOrderItems();
+      openModal('editOrderModal');
+    });
+}
+
+function fillEditCost() {
+  var sel = document.getElementById('eoProduct');
+  var opt = sel.options[sel.selectedIndex];
+  document.getElementById('eoCost').value = opt.dataset.cost || 0;
+}
+
+function addEditOrderItem() {
+  var sel  = document.getElementById('eoProduct');
+  var opt  = sel.options[sel.selectedIndex];
+  var pid  = parseInt(sel.value);
+  var qty  = parseInt(document.getElementById('eoQty').value) || 1;
+  var cost = parseFloat(document.getElementById('eoCost').value) || 0;
+  if (!pid) { alert('Select a product'); return; }
+  var existing = editOrderItems.find(function(i){ return i.product_id === pid; });
+  if (existing) { existing.qty += qty; existing.total = existing.qty * existing.cost; }
+  else { editOrderItems.push({ product_id: pid, product_name: opt.dataset.name, qty: qty, cost: cost, total: qty * cost }); }
+  renderEditOrderItems();
+  sel.value = ''; document.getElementById('eoQty').value = 1; document.getElementById('eoCost').value = 0;
+}
+
+function removeEditOrderItem(idx) { editOrderItems.splice(idx, 1); renderEditOrderItems(); }
+
+function renderEditOrderItems() {
+  var tbody = document.getElementById('editOrderItemsBody');
+  if (!editOrderItems.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state" style="padding:20px">No items added yet</td></tr>';
+    document.getElementById('editOrderTotal').textContent = fmt(0);
+    return;
+  }
+  tbody.innerHTML = editOrderItems.map(function(item, i) {
+    return '<tr><td>' + item.product_name + '</td><td class="text-mono">' + item.qty + '</td><td class="text-mono">' + fmt(item.cost) + '</td><td class="text-mono text-accent">' + fmt(item.total) + '</td><td><span style="cursor:pointer;color:var(--red);font-size:16px" onclick="removeEditOrderItem(' + i + ')">×</span></td></tr>';
+  }).join('');
+  document.getElementById('editOrderTotal').textContent = fmt(editOrderItems.reduce(function(s,i){ return s + i.total; }, 0));
+}
+
+function prepareEditOrder() {
+  if (!editOrderItems.length) { alert('Add at least one item'); return false; }
+  document.getElementById('editOrderItemsJson').value = JSON.stringify(editOrderItems);
+  return true;
 }
 </script>
 

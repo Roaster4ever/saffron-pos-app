@@ -24,12 +24,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: ?msg=Expense+added'); exit;
     }
 
+    if ($act === 'edit') {
+        $id      = intval($_POST['id']);
+        $title   = trim($_POST['title'] ?? '');
+        $amount  = floatval($_POST['amount'] ?? 0);
+        $catId   = intval($_POST['category_id'] ?? 0) ?: null;
+        $note    = trim($_POST['note'] ?? '');
+
+        if (!$title || $amount <= 0) { header('Location: ?error=Title+and+amount+required'); exit; }
+
+        $stmt = $conn->prepare("UPDATE expenses SET title=?, amount=?, category_id=?, note=? WHERE id=?");
+        $stmt->bind_param("sdssi", $title, $amount, $catId, $note, $id);
+        $stmt->execute();
+        auditLog($conn, 'expense_update', 'expense', $id, ['title' => $title, 'amount' => $amount]);
+        header('Location: ?msg=Expense+updated'); exit;
+    }
+
     if ($act === 'delete') {
         $id = intval($_POST['id']);
         $stmt = $conn->prepare("DELETE FROM expenses WHERE id=?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
         header('Location: ?msg=Expense+deleted'); exit;
+    }
+
+    if ($act === 'add_category') {
+        $name = trim($_POST['name'] ?? '');
+        if (!$name) { header('Location: ?error=Category+name+required'); exit; }
+        $stmt = $conn->prepare("INSERT INTO expense_categories (name) VALUES (?)");
+        $stmt->bind_param("s", $name);
+        $stmt->execute();
+        header('Location: ?msg=Category+added'); exit;
+    }
+
+    if ($act === 'delete_category') {
+        $id = intval($_POST['id']);
+        // Check if category is in use
+        $check = $conn->prepare("SELECT COUNT(*) cnt FROM expenses WHERE category_id=?");
+        $check->bind_param("i", $id);
+        $check->execute();
+        if ($check->get_result()->fetch_assoc()['cnt'] > 0) {
+            header('Location: ?error=Cannot+delete+category+in+use'); exit;
+        }
+        $stmt = $conn->prepare("DELETE FROM expense_categories WHERE id=?");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        header('Location: ?msg=Category+deleted'); exit;
     }
 }
 
@@ -114,7 +154,7 @@ include __DIR__ . '/../includes/header.php';
 <!-- Expenses table -->
 <div class="table-card">
   <table>
-    <thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Note</th><th>User</th><th style="width:80px"></th></tr></thead>
+    <thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Note</th><th>User</th><th style="width:120px"></th></tr></thead>
     <tbody>
     <?php if ($expenses): foreach ($expenses as $exp): ?>
       <tr>
@@ -125,7 +165,8 @@ include __DIR__ . '/../includes/header.php';
         <td class="text-muted" style="font-size:12px"><?= e($exp['note'] ?? '—') ?></td>
         <td class="text-muted" style="font-size:12px;white-space:nowrap"><?= e($exp['user_name'] ?? '—') ?></td>
         <td style="text-align:right">
-          <form method="POST" style="margin:0" onsubmit="return confirmDelete('Delete <?= e(addslashes($exp['title'])) ?>?')">
+          <button class="btn btn-secondary btn-sm" onclick='editExpense(<?= json_encode($exp) ?>)'>Edit</button>
+          <form method="POST" style="display:inline" onsubmit="return confirmDelete('Delete <?= e(addslashes($exp['title'])) ?>?')">
             <?= csrf_field() ?>
             <input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= $exp['id'] ?>">
             <button class="btn btn-danger btn-sm">Delete</button>
@@ -160,5 +201,72 @@ include __DIR__ . '/../includes/header.php';
     </div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('addModal')">Cancel</button><button type="submit" class="btn btn-primary">Add</button></div></form>
   </div>
 </div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header"><span class="modal-title">Edit Expense</span><span class="modal-close" onclick="closeModal('editModal')">&times;</span></div>
+    <form method="POST"><div class="modal-body">
+      <?= csrf_field() ?>
+      <input type="hidden" name="action" value="edit">
+      <input type="hidden" name="id" id="editExpId">
+      <div class="form-group"><label>Title *</label><input name="title" id="editExpTitle" class="form-control" required></div>
+      <div class="form-group"><label>Amount *</label><input name="amount" id="editExpAmount" type="number" step="0.01" min="0.01" class="form-control" required></div>
+      <div class="form-group"><label>Category</label>
+        <select name="category_id" id="editExpCat" class="form-control">
+          <option value="">— Select —</option>
+          <?php foreach ($categories as $c): ?>
+            <option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="form-group"><label>Note</label><textarea name="note" id="editExpNote" class="form-control" rows="2"></textarea></div>
+    </div><div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Cancel</button><button type="submit" class="btn btn-primary">Update</button></div></form>
+  </div>
+</div>
+
+<script>
+function editExpense(exp) {
+  document.getElementById('editExpId').value = exp.id;
+  document.getElementById('editExpTitle').value = exp.title;
+  document.getElementById('editExpAmount').value = exp.amount;
+  document.getElementById('editExpCat').value = exp.category_id || '';
+  document.getElementById('editExpNote').value = exp.note || '';
+  openModal('editModal');
+}
+</script>
+
+<!-- Expense Categories Management -->
+<?php if (isAdmin()): ?>
+<div class="table-card" style="margin-top:16px">
+  <div class="table-toolbar">
+    <strong style="font-size:13px">Expense Categories</strong>
+    <form method="POST" style="display:flex;gap:6px;align-items:center">
+      <?= csrf_field() ?>
+      <input type="hidden" name="action" value="add_category">
+      <input name="name" class="form-control" placeholder="New category name" style="width:180px;font-size:12px" required>
+      <button class="btn btn-primary btn-sm">Add</button>
+    </form>
+  </div>
+  <table>
+    <thead><tr><th>Category</th><th>Expenses</th><th style="width:80px"></th></tr></thead>
+    <tbody>
+    <?php foreach ($categories as $c): ?>
+      <tr>
+        <td><strong><?= e($c['name']) ?></strong></td>
+        <td class="text-mono text-muted" style="font-size:12px"><?= $c['id'] ? count(array_filter($expenses, function($e) use ($c) { return ($e['category_id'] ?? null) == $c['id']; })) : 0 ?></td>
+        <td>
+          <form method="POST" style="margin:0" onsubmit="return confirmDelete('Delete <?= e(addslashes($c['name'])) ?>?')">
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="delete_category"><input type="hidden" name="id" value="<?= $c['id'] ?>">
+            <button class="btn btn-danger btn-sm">Del</button>
+          </form>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+<?php endif; ?>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

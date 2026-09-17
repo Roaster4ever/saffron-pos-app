@@ -103,6 +103,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $names = explode(',', $quo['names']);
         $units = explode(',', $quo['units']);
 
+        // Validate stock availability before conversion
+        $stockErrors = [];
+        for ($i = 0; $i < count($pids); $i++) {
+            $pid = intval($pids[$i]);
+            $qty = floatval($qtys[$i]);
+            if ($pid && $qty > 0) {
+                $stockStmt = $conn->prepare("SELECT stock, reserved_stock, name FROM products WHERE id=?");
+                $stockStmt->bind_param("i", $pid);
+                $stockStmt->execute();
+                $prod = $stockStmt->get_result()->fetch_assoc();
+                if ($prod) {
+                    $available = $prod['stock'] - ($prod['reserved_stock'] ?? 0);
+                    if ($qty > $available) {
+                        $stockErrors[] = e($prod['name']) . " (need {$qty}, available {$available})";
+                    }
+                }
+            }
+        }
+        if (!empty($stockErrors)) {
+            header('Location: ?error=Insufficient+stock:+' . urlencode(implode(', ', $stockErrors))); exit;
+        }
+
         $invoice = generateInvoice($conn);
         $uid = $_SESSION['user_id'] ?? null;
 

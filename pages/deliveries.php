@@ -85,6 +85,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute();
         header('Location: ?msg=Status+updated'); exit;
     }
+
+    if ($act === 'cancel') {
+        $id = intval($_POST['id']);
+        // Only cancel pending or partially_delivered
+        $stmt = $conn->prepare("SELECT * FROM deliveries WHERE id=? AND status IN ('pending','partially_delivered')");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $del = $stmt->get_result()->fetch_assoc();
+        if (!$del) { header('Location: ?error=Delivery+not+cancellable'); exit; }
+
+        $conn->begin_transaction();
+        try {
+            // Return any reserved stock
+            $items = $conn->prepare("SELECT * FROM delivery_items WHERE delivery_id=?");
+            $items->bind_param("i", $id);
+            $items->execute();
+            $delItems = $items->get_result()->fetch_all(MYSQLI_ASSOC);
+            foreach ($delItems as $di) {
+                if ($di['product_id'] && $di['qty_delivered'] > 0) {
+                    // Re-deliver already delivered items (stock was deducted)
+                    $stmt3 = $conn->prepare("UPDATE products SET stock=stock+? WHERE id=?");
+                    $stmt3->bind_param("di", $di['qty_delivered'], $di['product_id']);
+                    $stmt3->execute();
+                    logInventoryMovement($conn, $di['product_id'], $di['qty_delivered'], 'cancel_delivery', 'cancel_delivery', "Delivery {$del['delivery_no']} cancelled");
+                }
+            }
+
+            $stmt2 = $conn->prepare("UPDATE deliveries SET status='cancelled' WHERE id=?");
+            $stmt2->bind_param("i", $id);
+            $stmt2->execute();
+            auditLog($conn, 'delivery_cancel', 'delivery', $id, ['delivery_no' => $del['delivery_no']]);
+            $conn->commit();
+            header('Location: ?msg=Delivery+cancelled'); exit;
+        } catch (Exception $ex) {
+            $conn->rollback();
+            header('Location: ?error=Cancel+failed'); exit;
+        }
+    }
+
+    if ($act === 'delete') {
+        $id = intval($_POST['id']);
+        $stmt = $conn->prepare("DELETE FROM delivery_items WHERE delivery_id=?");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $stmt2 = $conn->prepare("DELETE FROM deliveries WHERE id=?");
+        $stmt2->bind_param("i", $id);
+        $stmt2->execute();
+        header('Location: ?msg=Delivery+deleted'); exit;
+    }
 }
 
 $pageTitle = 'Deliveries';
@@ -151,14 +200,20 @@ include __DIR__ . '/../includes/header.php';
         </td>
         <td>
           <button class="btn btn-secondary btn-sm" onclick="viewDelivery(<?= $d['id'] ?>)">View</button>
-          <?php if ($d['status'] !== 'delivered' && $d['status'] !== 'cancelled' && isAdmin()): ?>
-          <form method="POST" style="display:inline" onsubmit="return confirm('Mark as delivered?')">
-            <?= csrf_field() ?>
-            <input type="hidden" name="action" value="update_status">
-            <input type="hidden" name="id" value="<?= $d['id'] ?>">
-            <input type="hidden" name="status" value="delivered">
-            <button class="btn btn-primary btn-sm">Delivered</button>
-          </form>
+          <?php if ($d['status'] === 'pending' || $d['status'] === 'partially_delivered'): ?>
+            <form method="POST" style="display:inline" onsubmit="return confirm('Mark as delivered?')">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="update_status">
+              <input type="hidden" name="id" value="<?= $d['id'] ?>">
+              <input type="hidden" name="status" value="delivered">
+              <button class="btn btn-primary btn-sm">Delivered</button>
+            </form>
+            <form method="POST" style="display:inline" onsubmit="return confirmDelete('Cancel this delivery?')">
+              <?= csrf_field() ?>
+              <input type="hidden" name="action" value="cancel">
+              <input type="hidden" name="id" value="<?= $d['id'] ?>">
+              <button class="btn btn-danger btn-sm">Cancel</button>
+            </form>
           <?php endif; ?>
         </td>
       </tr>

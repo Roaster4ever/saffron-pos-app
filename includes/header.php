@@ -51,6 +51,9 @@
       <a href="<?= BASE_URL ?>/pages/categories.php" class="nav-item <?= ($activePage??'')==='categories'?'active':'' ?>">
         <span class="nav-icon">&#9641;</span><span>Categories</span>
       </a>
+      <a href="<?= BASE_URL ?>/pages/units.php" class="nav-item <?= ($activePage??'')==='units'?'active':'' ?>">
+        <span class="nav-icon">&#8260;</span><span>Units</span>
+      </a>
       <div class="nav-section">Business</div>
       <a href="<?= BASE_URL ?>/pages/customers.php" class="nav-item <?= ($activePage??'')==='customers'?'active':'' ?>">
         <span class="nav-icon">&#9823;</span><span>Customers</span>
@@ -60,6 +63,9 @@
       </a>
       <a href="<?= BASE_URL ?>/pages/orders.php" class="nav-item <?= ($activePage??'')==='orders'?'active':'' ?>">
         <span class="nav-icon">&#9641;</span><span>Purchase Orders</span>
+      </a>
+      <a href="<?= BASE_URL ?>/pages/projects.php" class="nav-item <?= ($activePage??'')==='projects'?'active':'' ?>">
+        <span class="nav-icon">&#9635;</span><span>Projects</span>
       </a>
       <a href="<?= BASE_URL ?>/pages/receivables.php" class="nav-item <?= ($activePage??'')==='receivables'?'active':'' ?>">
         <span class="nav-icon">&#9733;</span><span>Receivables</span>
