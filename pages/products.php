@@ -107,10 +107,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($act === 'delete') {
         $id = intval($_POST['id']);
-        $stmt = $conn->prepare("DELETE FROM products WHERE id=?");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
-        header('Location: ?msg=Product+deleted'); exit;
+        // Check for existing transactions
+        $check = $conn->prepare("SELECT (SELECT COUNT(*) FROM sale_items WHERE product_id=?) + (SELECT COUNT(*) FROM order_items WHERE product_id=?) + (SELECT COUNT(*) FROM delivery_items WHERE product_id=?) + (SELECT COUNT(*) FROM quotation_items WHERE product_id=?) AS cnt");
+        $check->bind_param("iiii", $id, $id, $id, $id);
+        $check->execute();
+        $hasTransactions = $check->get_result()->fetch_assoc()['cnt'] > 0;
+        if ($hasTransactions) {
+            // Soft delete — deactivate but preserve history
+            $stmt = $conn->prepare("UPDATE products SET is_active=0 WHERE id=?");
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+            header('Location: ?msg=Product+deactivated+(has+transaction+history)'); exit;
+        } else {
+            // Hard delete — no history, safe to remove
+            $stmt = $conn->prepare("DELETE FROM products WHERE id=?");
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+            header('Location: ?msg=Product+deleted'); exit;
+        }
     }
 
     if ($act === 'stock_in') {

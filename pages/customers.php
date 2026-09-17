@@ -58,10 +58,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($act === 'delete') {
         $id = intval($_POST['id']);
-        $stmt = $conn->prepare("DELETE FROM customers_v2 WHERE id=?");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
-        header('Location: ?msg=Customer+deleted'); exit;
+        // Check for existing transactions
+        $check = $conn->prepare("SELECT (SELECT COUNT(*) FROM sales WHERE customer_v2_id=?) + (SELECT COUNT(*) FROM customer_payments WHERE customer_id=?) + (SELECT COUNT(*) FROM customer_ledger WHERE customer_id=?) + (SELECT COUNT(*) FROM quotations WHERE customer_id=?) + (SELECT COUNT(*) FROM deliveries WHERE customer_id=?) AS cnt");
+        $check->bind_param("iiiii", $id, $id, $id, $id, $id);
+        $check->execute();
+        $hasTransactions = $check->get_result()->fetch_assoc()['cnt'] > 0;
+        if ($hasTransactions) {
+            // Soft delete — hide from lists but preserve data
+            $stmt = $conn->prepare("UPDATE customers_v2 SET is_active=0 WHERE id=?");
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+            header('Location: ?msg=Customer+deactivated+(has+transaction+history)'); exit;
+        } else {
+            // Hard delete — no history, safe to remove
+            $stmt = $conn->prepare("DELETE FROM customers_v2 WHERE id=?");
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+            header('Location: ?msg=Customer+deleted'); exit;
+        }
     }
 }
 

@@ -407,7 +407,7 @@ function submitPartialRefund() {
 }
 </script>
 
-<script src="<?= BASE_URL ?>/&#34;/js/pie-chart.js"></script>
+<script src="<?= BASE_URL ?>/js/pie-chart.js"></script>
 <script>
 var CURRENCY_SALES = '<?= addslashes(CURRENCY) ?>';
 renderPieChart('paymentPieChart', [

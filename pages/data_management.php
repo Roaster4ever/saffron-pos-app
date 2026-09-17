@@ -456,9 +456,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($act === 'export_expenses') {
         $where = '1=1'; $params = []; $types = '';
-        if (!empty($_POST['date_from'])) { $where .= ' AND e.expense_date >= ?'; $params[] = $_POST['date_from']; $types .= 's'; }
-        if (!empty($_POST['date_to'])) { $where .= ' AND e.expense_date <= ?'; $params[] = $_POST['date_to']; $types .= 's'; }
-        $sql = "SELECT e.title, e.amount, ec.name category, e.expense_date, e.note, u.name user FROM expenses e LEFT JOIN expense_categories ec ON e.category_id=ec.id LEFT JOIN users u ON e.user_id=u.id WHERE {$where} ORDER BY e.expense_date DESC";
+        if (!empty($_POST['date_from'])) { $where .= ' AND DATE(e.created_at) >= ?'; $params[] = $_POST['date_from']; $types .= 's'; }
+        if (!empty($_POST['date_to'])) { $where .= ' AND DATE(e.created_at) <= ?'; $params[] = $_POST['date_to']; $types .= 's'; }
+        $sql = "SELECT e.title, e.amount, ec.name category, DATE(e.created_at) AS expense_date, e.note, u.name user FROM expenses e LEFT JOIN expense_categories ec ON e.category_id=ec.id LEFT JOIN users u ON e.user_id=u.id WHERE {$where} ORDER BY e.created_at DESC";
         $stmt = $conn->prepare($sql);
         if ($types) $stmt->bind_param($types, ...$params);
         $stmt->execute();

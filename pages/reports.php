@@ -17,10 +17,16 @@ $grossProfit = $pl['revenue'] - $pl['tax_collected'] - $pl['cogs'];
 $margin = $pl['revenue'] > 0 ? round(($grossProfit / ($pl['revenue'] - $pl['tax_collected'])) * 100, 1) : 0;
 
 // 2. Sales by Brand
-$brandSales = $conn->query("SELECT b.name, SUM(si.total) revenue, SUM(si.qty) qty, SUM(si.total - (si.qty * p.cost)) profit FROM sale_items si JOIN products p ON si.product_id=p.id JOIN brands b ON p.brand_id=b.id JOIN sales s ON si.sale_id=s.id WHERE DATE(s.created_at) BETWEEN '$from' AND '$to' AND s.status='completed' GROUP BY b.id ORDER BY revenue DESC")->fetch_all(MYSQLI_ASSOC);
+$stmtBrand = $conn->prepare("SELECT b.name, SUM(si.total) revenue, SUM(si.qty) qty, SUM(si.total - (si.qty * p.cost)) profit FROM sale_items si JOIN products p ON si.product_id=p.id JOIN brands b ON p.brand_id=b.id JOIN sales s ON si.sale_id=s.id WHERE DATE(s.created_at) BETWEEN ? AND ? AND s.status='completed' GROUP BY b.id ORDER BY revenue DESC");
+$stmtBrand->bind_param("ss", $from, $to);
+$stmtBrand->execute();
+$brandSales = $stmtBrand->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // 3. Sales by Category
-$catSales = $conn->query("SELECT c.name, SUM(si.total) revenue, SUM(si.qty) qty FROM sale_items si JOIN products p ON si.product_id=p.id JOIN categories c ON p.category_id=c.id JOIN sales s ON si.sale_id=s.id WHERE DATE(s.created_at) BETWEEN '$from' AND '$to' AND s.status='completed' GROUP BY c.id ORDER BY revenue DESC")->fetch_all(MYSQLI_ASSOC);
+$stmtCat = $conn->prepare("SELECT c.name, SUM(si.total) revenue, SUM(si.qty) qty FROM sale_items si JOIN products p ON si.product_id=p.id JOIN categories c ON p.category_id=c.id JOIN sales s ON si.sale_id=s.id WHERE DATE(s.created_at) BETWEEN ? AND ? AND s.status='completed' GROUP BY c.id ORDER BY revenue DESC");
+$stmtCat->bind_param("ss", $from, $to);
+$stmtCat->execute();
+$catSales = $stmtCat->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // 4. Credit Outstanding
 $creditTotal = $conn->query("SELECT COALESCE(SUM(outstanding),0) total FROM sales WHERE outstanding > 0 AND status='completed'")->fetch_assoc()['total'];
@@ -30,7 +36,10 @@ $creditCount = $conn->query("SELECT COUNT(*) cnt FROM sales WHERE outstanding > 
 $lowStock = $conn->query("SELECT p.name, p.sku, p.stock, p.low_stock_alert, b.name brand_name FROM products p LEFT JOIN brands b ON p.brand_id=b.id WHERE p.stock <= p.low_stock_alert AND p.is_active=1 ORDER BY p.stock ASC")->fetch_all(MYSQLI_ASSOC);
 
 // 6. Top profit items
-$topProfit = $conn->query("SELECT p.name, b.name brand_name, SUM(si.qty) qty, SUM(si.total) revenue, SUM(si.total - (si.qty * p.cost)) profit FROM sale_items si JOIN products p ON si.product_id=p.id LEFT JOIN brands b ON p.brand_id=b.id JOIN sales s ON si.sale_id=s.id WHERE DATE(s.created_at) BETWEEN '$from' AND '$to' AND s.status='completed' GROUP BY p.id ORDER BY profit DESC LIMIT 10")->fetch_all(MYSQLI_ASSOC);
+$stmtProfit = $conn->prepare("SELECT p.name, b.name brand_name, SUM(si.qty) qty, SUM(si.total) revenue, SUM(si.total - (si.qty * p.cost)) profit FROM sale_items si JOIN products p ON si.product_id=p.id LEFT JOIN brands b ON p.brand_id=b.id JOIN sales s ON si.sale_id=s.id WHERE DATE(s.created_at) BETWEEN ? AND ? AND s.status='completed' GROUP BY p.id ORDER BY profit DESC LIMIT 10");
+$stmtProfit->bind_param("ss", $from, $to);
+$stmtProfit->execute();
+$topProfit = $stmtProfit->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // 7. Inventory value
 $stockValue = $conn->query("SELECT COUNT(*) products, COALESCE(SUM(stock),0) total_units, COALESCE(SUM(cost * stock),0) cost_value, COALESCE(SUM(price * stock),0) retail_value FROM products WHERE is_active=1")->fetch_assoc();
