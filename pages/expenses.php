@@ -33,7 +33,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-header('Cache-Control: no-store, no-cache, must-revalidate');
 $pageTitle = 'Expenses';
 $activePage = 'expenses';
 
@@ -65,12 +64,9 @@ $byCategory = $stmtC->get_result()->fetch_all(MYSQLI_ASSOC);
 
 // Expenses list
 $offset = max(0, (intval($_GET['page'] ?? 1) - 1)) * 20;
-$expSql = "SELECT e.*, ec.name cat_name, u.name user_name FROM expenses e LEFT JOIN expense_categories ec ON e.category_id=ec.id LEFT JOIN users u ON e.user_id=u.id $where ORDER BY e.created_at DESC LIMIT 20 OFFSET ?";
-$expParams = $params;
-$expParams[] = $offset;
-$expTypes = $types . 'i';
+$expSql = "SELECT e.*, ec.name cat_name, u.name user_name FROM expenses e LEFT JOIN expense_categories ec ON e.category_id=ec.id LEFT JOIN users u ON e.user_id=u.id $where ORDER BY e.created_at DESC LIMIT 20 OFFSET " . intval($offset);
 $stmtE = $conn->prepare($expSql);
-$stmtE->bind_param($expTypes, ...$expParams);
+$stmtE->bind_param($types, ...$params);
 $stmtE->execute();
 $expenses = $stmtE->get_result()->fetch_all(MYSQLI_ASSOC);
 
@@ -118,20 +114,20 @@ include __DIR__ . '/../includes/header.php';
 <!-- Expenses table -->
 <div class="table-card">
   <table>
-    <thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Note</th><th>User</th><th>Actions</th></tr></thead>
+    <thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Amount</th><th>Note</th><th>User</th><th style="width:80px"></th></tr></thead>
     <tbody>
-    <?php if ($expenses): foreach ($expenses as $e): ?>
+    <?php if ($expenses): foreach ($expenses as $exp): ?>
       <tr>
-        <td class="text-muted" style="font-size:12px"><?= date('d/m/Y', strtotime($e['created_at'])) ?></td>
-        <td><strong><?= e($e['title']) ?></strong></td>
-        <td><span class="badge badge-orange"><?= e($e['cat_name'] ?? '—') ?></span></td>
-        <td class="text-mono text-red"><?= money($e['amount']) ?></td>
-        <td class="text-muted" style="font-size:12px"><?= e($e['note'] ?? '—') ?></td>
-        <td class="text-muted" style="font-size:12px"><?= e($e['user_name'] ?? '—') ?></td>
-        <td>
-          <form method="POST" style="display:inline" onsubmit="return confirmDelete('Delete expense <?= e(addslashes($e['title'])) ?>?')">
+        <td style="font-size:12px;white-space:nowrap"><?= date('d/m/Y', strtotime($exp['created_at'])) ?></td>
+        <td><strong><?= e($exp['title']) ?></strong></td>
+        <td><span class="badge badge-orange"><?= e($exp['cat_name'] ?? '—') ?></span></td>
+        <td class="text-mono text-red"><?= money($exp['amount']) ?></td>
+        <td class="text-muted" style="font-size:12px"><?= e($exp['note'] ?? '—') ?></td>
+        <td class="text-muted" style="font-size:12px;white-space:nowrap"><?= e($exp['user_name'] ?? '—') ?></td>
+        <td style="text-align:right">
+          <form method="POST" style="margin:0" onsubmit="return confirmDelete('Delete <?= e(addslashes($exp['title'])) ?>?')">
             <?= csrf_field() ?>
-            <input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= $e['id'] ?>">
+            <input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= $exp['id'] ?>">
             <button class="btn btn-danger btn-sm">Delete</button>
           </form>
         </td>

@@ -166,12 +166,9 @@ $totalPages = max(1, ceil($totalInvoices / $perPage));
 if ($invPage > $totalPages) $invPage = $totalPages;
 $offset = ($invPage - 1) * $perPage;
 
-$invSql = "SELECT s.*, COALESCE(cv.name, 'Walk-in') cust_name FROM sales s LEFT JOIN customers_v2 cv ON s.customer_v2_id=cv.id $whereInv ORDER BY s.created_at DESC LIMIT ? OFFSET ?";
-$invTypes = $typesInv . "ii";
-$paramsInv[] = $perPage;
-$paramsInv[] = $offset;
+$invSql = "SELECT s.*, COALESCE(cv.name, 'Walk-in') cust_name FROM sales s LEFT JOIN customers_v2 cv ON s.customer_v2_id=cv.id $whereInv ORDER BY s.created_at DESC LIMIT " . intval($perPage) . " OFFSET " . intval($offset);
 $stmt = $conn->prepare($invSql);
-$stmt->bind_param($invTypes, ...$paramsInv);
+$stmt->bind_param($typesInv, ...$paramsInv);
 $stmt->execute();
 $sales = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
