@@ -36,8 +36,8 @@ $lowStock = $conn->query("SELECT COUNT(*) c FROM products WHERE stock <= low_sto
 $outOfStock = $conn->query("SELECT COUNT(*) c FROM products WHERE stock = 0 AND is_active=1")->fetch_assoc()['c'];
 $totalStockValue = $conn->query("SELECT COALESCE(SUM(cost * stock),0) v FROM products WHERE is_active=1")->fetch_assoc()['v'];
 
-// Outstanding receivables (customers with negative balance = owe us money)
-$outstanding = $conn->query("SELECT COALESCE(SUM(ABS(balance_after)),0) v FROM customer_ledger WHERE type='invoice' AND balance_after > 0")->fetch_assoc()['v'];
+// Outstanding receivables
+$outstanding = $conn->query("SELECT COALESCE(SUM(outstanding),0) v FROM sales WHERE outstanding > 0 AND status='completed'")->fetch_assoc()['v'];
 
 // Top selling products
 $topProducts = $conn->query("SELECT p.name, b.name brand, SUM(si.qty) qty, SUM(si.total) rev FROM sale_items si JOIN products p ON si.product_id=p.id LEFT JOIN brands b ON p.brand_id=b.id JOIN sales s ON si.sale_id=s.id WHERE s.status='completed' AND DATE(s.created_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) GROUP BY si.product_id ORDER BY qty DESC LIMIT 8")->fetch_all(MYSQLI_ASSOC);

@@ -725,7 +725,34 @@ function downloadPDF() {
 }
 </script>
 
-<!-- Barcode Picker Modal -->
+<script>
+/* ── Keyboard Shortcuts ── */
+document.addEventListener('keydown', function(e) {
+  // Don't trigger when typing in inputs
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+  switch(e.key) {
+    case '/':
+    case 'F2':
+      e.preventDefault();
+      var sb = document.getElementById('searchBox');
+      if (sb) { sb.focus(); sb.select(); }
+      break;
+    case 'F5':
+      e.preventDefault();
+      clearCart();
+      break;
+    case 'F9':
+      e.preventDefault();
+      submitSale();
+      break;
+    case 'Escape':
+      // Close any open modal
+      document.querySelectorAll('.modal-overlay.open').forEach(function(m) { m.classList.remove('open'); });
+      break;
+  }
+});
+</script>
 <div class="modal-overlay" id="barcodePicker">
   <div class="modal" style="max-width:400px">
     <div class="modal-header">

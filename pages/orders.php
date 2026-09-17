@@ -135,6 +135,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// CSV Export
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+    $exportOrders = $conn->query("SELECT o.order_no, s.name supplier_name, o.total, o.status, o.ordered_at, o.received_at, o.note FROM orders o LEFT JOIN suppliers s ON o.supplier_id=s.supplier_id ORDER BY o.ordered_at DESC")->fetch_all(MYSQLI_ASSOC);
+    $headers = ['order_no','supplier','total','status','ordered_at','received_at','note'];
+    $rows = array_map(function($o) {
+        return array_map('csvEscape', [
+            'order_no' => $o['order_no'], 'supplier' => $o['supplier_name'] ?? '', 'total' => $o['total'],
+            'status' => $o['status'], 'ordered_at' => $o['ordered_at'], 'received_at' => $o['received_at'] ?? '',
+            'note' => $o['note'] ?? '',
+        ]);
+    }, $exportOrders);
+    auditLog($conn, 'order_csv_export', 'system', null, ['count' => count($rows)]);
+    sendCsvDownload('saffron-orders-' . date('Y-m-d') . '.csv', generateCsv($headers, $rows));
+}
+
 $pageTitle  = 'Orders';
 $activePage = 'orders';
 
@@ -155,7 +170,10 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="page-header">
   <div><div class="page-title">Purchase Orders</div></div>
-  <button class="btn btn-primary" onclick="openModal('newOrderModal')">+ New Order</button>
+  <div style="display:flex;gap:8px">
+    <a href="?export=csv" class="btn btn-secondary btn-sm">Export CSV</a>
+    <button class="btn btn-primary" onclick="openModal('newOrderModal')">+ New Order</button>
+  </div>
 </div>
 
 <?php if ($supFilter): ?>

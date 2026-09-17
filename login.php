@@ -50,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                 $stmt2->bind_param("iss", $user['id'], $user['username'], $ipAddr);
                 $stmt2->execute();
                 $_SESSION['session_id'] = $conn->insert_id;
+                auditLog($conn, 'login_success', 'auth', $user['id'], ['username' => $user['username']], $ipAddr);
                 header('Location: ' . BASE_URL . '/index.php');
                 exit;
             } else {

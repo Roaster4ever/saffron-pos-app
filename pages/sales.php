@@ -123,6 +123,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'refun
     }
 }
 
+// CSV Export
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+    $exportSales = $conn->query("SELECT s.invoice_no, COALESCE(cv.name, 'Walk-in') customer_name, s.subtotal, s.discount, s.tax, s.total, s.paid, s.outstanding, s.payment_method, s.status, s.created_at FROM sales s LEFT JOIN customers_v2 cv ON s.customer_v2_id=cv.id ORDER BY s.created_at DESC")->fetch_all(MYSQLI_ASSOC);
+    $headers = ['invoice_no','customer','subtotal','discount','tax','total','paid','outstanding','payment_method','status','date'];
+    $rows = array_map(function($s) {
+        return array_map('csvEscape', [
+            'invoice_no' => $s['invoice_no'], 'customer' => $s['customer_name'], 'subtotal' => $s['subtotal'],
+            'discount' => $s['discount'], 'tax' => $s['tax'], 'total' => $s['total'], 'paid' => $s['paid'],
+            'outstanding' => $s['outstanding'], 'payment_method' => $s['payment_method'], 'status' => $s['status'],
+            'date' => $s['created_at'],
+        ]);
+    }, $exportSales);
+    auditLog($conn, 'sales_csv_export', 'system', null, ['count' => count($rows)]);
+    sendCsvDownload('saffron-sales-' . date('Y-m-d') . '.csv', generateCsv($headers, $rows));
+}
+
 $pageTitle = 'Sales';
 $activePage = 'sales';
 
@@ -194,11 +210,14 @@ include __DIR__ . '/../includes/header.php';
     <div class="page-title">Sales History</div>
     <div class="page-subtitle"><?= $totals['cnt'] ?> transactions &middot; <?= money($totals['rev']) ?> revenue &middot; <?= money($totals['total_outstanding']) ?> outstanding</div>
   </div>
-  <form method="GET" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="?from=<?= e($from) ?>&to=<?= e($to) ?>&export=csv" class="btn btn-secondary btn-sm">Export CSV</a>
+    <form method="GET" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     <input type="date" name="from" value="<?= e($from) ?>" class="form-control" style="width:140px">
     <input type="date" name="to" value="<?= e($to) ?>" class="form-control" style="width:140px">
     <button class="btn btn-primary btn-sm">Apply</button>
-  </form>
+    </form>
+  </div>
 </div>
 
 <!-- Stats -->
@@ -310,7 +329,10 @@ include __DIR__ . '/../includes/header.php';
   <div class="modal" style="max-width:500px">
     <div class="modal-header"><span class="modal-title">Sale Details</span><span class="modal-close" onclick="closeModal('saleModal')">&times;</span></div>
     <div class="modal-body" id="saleDetail"><div class="empty-state">Loading...</div></div>
-    <div class="modal-footer"><button onclick="closeModal('saleModal')" class="btn btn-primary btn-sm">Close</button></div>
+    <div class="modal-footer">
+      <button onclick="printInvoice()" class="btn btn-secondary btn-sm">Print</button>
+      <button onclick="closeModal('saleModal')" class="btn btn-primary btn-sm">Close</button>
+    </div>
   </div>
 </div>
 
@@ -332,7 +354,25 @@ function viewSale(id) {
   openModal('saleModal');
   fetch('<?= BASE_URL ?>/pages/sale_detail.php?id=' + id)
     .then(function(r) { return r.text(); })
-    .then(function(h) { document.getElementById('saleDetail').innerHTML = h; });
+    .then(function(h) { document.getElementById('saleDetail').innerHTML = h; window._currentSaleId = id; });
+}
+
+function printInvoice() {
+  var content = document.getElementById('saleDetail').innerHTML;
+  var win = window.open('', '_blank', 'width=400,height=600');
+  win.document.write('<!DOCTYPE html><html><head><title>Invoice</title><style>');
+  win.document.write('body{font-family:monospace;font-size:12px;margin:20px;color:#000}');
+  win.document.write('.receipt{max-width:350px;margin:0 auto}');
+  win.document.write('.receipt-title{font-size:16px;font-weight:700;text-align:center}');
+  win.document.write('.receipt-sub{font-size:11px;text-align:center;color:#666}');
+  win.document.write('.receipt-divider{border:none;border-top:1px dashed #ccc;margin:8px 0}');
+  win.document.write('.receipt-row{display:flex;justify-content:space-between;padding:2px 0}');
+  win.document.write('hr{border:none;border-top:1px dashed #ccc;margin:6px 0}');
+  win.document.write('</style></head><body>');
+  win.document.write('<div class="receipt">' + content + '</div>');
+  win.document.write('</body></html>');
+  win.document.close();
+  win.print();
 }
 
 /* ── Partial Refund ── */

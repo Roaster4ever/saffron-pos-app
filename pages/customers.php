@@ -79,6 +79,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// CSV Export
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+    $customers = $conn->query("SELECT c.name, c.type, c.phone, c.whatsapp, c.email, c.city, c.address, c.credit_limit, c.is_active,
+        (SELECT COALESCE(balance_after, 0) FROM customer_ledger WHERE customer_id = c.id ORDER BY id DESC LIMIT 1) as balance
+        FROM customers_v2 c ORDER BY c.name")->fetch_all(MYSQLI_ASSOC);
+    $headers = ['name','type','phone','whatsapp','email','city','address','credit_limit','balance','status'];
+    $rows = array_map(function($c) {
+        return array_map('csvEscape', [
+            'name' => $c['name'], 'type' => $c['type'], 'phone' => $c['phone'] ?? '', 'whatsapp' => $c['whatsapp'] ?? '',
+            'email' => $c['email'] ?? '', 'city' => $c['city'] ?? '', 'address' => $c['address'] ?? '',
+            'credit_limit' => $c['credit_limit'], 'balance' => $c['balance'], 'status' => $c['is_active'] ? 'active' : 'inactive',
+        ]);
+    }, $customers);
+    auditLog($conn, 'customer_csv_export', 'system', null, ['count' => count($rows)]);
+    sendCsvDownload('saffron-customers-' . date('Y-m-d') . '.csv', generateCsv($headers, $rows));
+}
+
 $pageTitle = 'Customers';
 $activePage = 'customers';
 $search = trim($_GET['q'] ?? '');
@@ -119,7 +136,10 @@ include __DIR__ . '/../includes/header.php';
     <div class="page-title">Customers</div>
     <div class="page-subtitle"><?= count($customers) ?> customers</div>
   </div>
-  <button class="btn btn-primary" onclick="openModal('addModal')">+ Add Customer</button>
+  <div style="display:flex;gap:8px">
+    <a href="?export=csv" class="btn btn-secondary btn-sm">Export CSV</a>
+    <button class="btn btn-primary" onclick="openModal('addModal')">+ Add Customer</button>
+  </div>
 </div>
 
 <div class="table-card">

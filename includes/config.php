@@ -65,7 +65,12 @@ set_exception_handler(function ($ex) {
             header('Content-Type: application/json');
             echo json_encode(['success' => false, 'error' => 'An unexpected error occurred.']);
         } else {
-            echo '<div style="font-family:sans-serif;padding:40px;background:#fee;color:#c00;border:2px solid #c00;margin:40px;border-radius:8px"><h2>Something went wrong</h2><p>Please try again. If the problem persists, contact support.</p></div>';
+            $errorPage = dirname(__DIR__) . '/500.php';
+            if (file_exists($errorPage)) {
+                include $errorPage;
+            } else {
+                echo '<div style="font-family:sans-serif;padding:40px;background:#fee;color:#c00;border:2px solid #c00;margin:40px;border-radius:8px"><h2>Something went wrong</h2><p>Please try again. If the problem persists, contact support.</p></div>';
+            }
         }
     }
     exit;
