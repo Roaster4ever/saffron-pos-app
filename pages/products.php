@@ -8,41 +8,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $act = $_POST['action'] ?? '';
 
     if ($act === 'add' || $act === 'edit') {
-        $name    = trim($_POST['name'] ?? '');
-        $cat     = intval($_POST['category_id'] ?? 0);
-        $brand   = intval($_POST['brand_id'] ?? 0);
-        $price   = floatval($_POST['price'] ?? 0);
-        $cost    = floatval($_POST['cost'] ?? 0);
-        $stock   = floatval($_POST['stock'] ?? 0);
-        $alert   = floatval($_POST['low_stock_alert'] ?? 5);
-        $barcode = trim($_POST['barcode'] ?? '');
-        $sku     = trim($_POST['sku'] ?? '');
-        $model   = trim($_POST['model'] ?? '');
-        $unitId  = intval($_POST['unit_id'] ?? 0);
+        $name    = validateString($_POST['name'] ?? '', 200);
+        $cat     = validateInt($_POST['category_id'] ?? 0, 0);
+        $brand   = validateInt($_POST['brand_id'] ?? 0, 0);
+        $price   = validateMoney($_POST['price'] ?? 0);
+        $cost    = validateMoney($_POST['cost'] ?? 0);
+        $stock   = validateMoney($_POST['stock'] ?? 0, 9999999);
+        $alert   = validateMoney($_POST['low_stock_alert'] ?? 5, 99999);
+        $barcode = validateString($_POST['barcode'] ?? '', 50);
+        $sku     = validateString($_POST['sku'] ?? '', 50);
+        $model   = validateString($_POST['model'] ?? '', 100);
+        $unitId  = validateInt($_POST['unit_id'] ?? 0, 0);
         $taxable = isset($_POST['taxable']) ? 1 : 0;
-        $gstRate = floatval($_POST['gst_rate'] ?? 18);
+        $gstRate = validateMoney($_POST['gst_rate'] ?? 18, 100);
         $taxMode = $_POST['tax_mode'] ?? 'default';
         if (!in_array($taxMode, ['default','non_taxable','custom'])) $taxMode = 'default';
-        // Derive legacy taxable/gst_rate from tax_mode for backward compat
         if ($taxMode === 'non_taxable') {
             $taxable = 0;
             $gstRate = 0;
         } elseif ($taxMode === 'custom') {
             $taxable = 1;
-        } else { // default
+        } else {
             $taxable = 1;
             $gstRate = 18;
         }
-        $minPrice    = floatval($_POST['min_price'] ?? 0);
-        $wholesale   = floatval($_POST['wholesale_price'] ?? 0);
-        $contractor  = floatval($_POST['contractor_price'] ?? 0);
-        $description = trim($_POST['description'] ?? '');
+        $minPrice    = validateMoney($_POST['min_price'] ?? 0) ?? 0;
+        $wholesale   = validateMoney($_POST['wholesale_price'] ?? 0) ?? 0;
+        $contractor  = validateMoney($_POST['contractor_price'] ?? 0) ?? 0;
+        $description = validateString($_POST['description'] ?? '', 2000);
         $isActive    = isset($_POST['is_active']) ? 1 : 1;
-        // Measured product fields
         $sellingMode = $_POST['selling_mode'] ?? 'fixed';
         if (!in_array($sellingMode, ['fixed','measured'])) $sellingMode = 'fixed';
-        $standardLengths = trim($_POST['standard_lengths'] ?? '');
-        $defaultQty = strlen($_POST['default_qty'] ?? '') > 0 ? floatval($_POST['default_qty']) : null;
+        $standardLengths = validateString($_POST['standard_lengths'] ?? '', 500);
+        $defaultQty = strlen($_POST['default_qty'] ?? '') > 0 ? validateMoney($_POST['default_qty'], 9999) : null;
+
+        if (!$name || $price === false) { header('Location: ?error=Name+and+valid+price+required'); exit; }
 
         // Validate measured product requires a unit with allows_decimal
         if ($sellingMode === 'measured' && $unitId) {

@@ -57,3 +57,13 @@ function row($l,$v){ return '<div style="display:flex;justify-content:space-betw
 <div style="text-align:right;margin-top:10px;font-size:15px;font-weight:800">
   Total: <span style="color:var(--accent)"><?= money($order['total']) ?></span>
 </div>
+<?php if ($order['status'] !== 'cancelled'): ?>
+<div style="margin-top:12px;text-align:left">
+  <form method="POST" action="<?= BASE_URL ?>/pages/orders.php" style="display:inline" onsubmit="return confirm('Create a new order duplicated from this one?')">
+    <?= csrf_field() ?>
+    <input type="hidden" name="action" value="duplicate">
+    <input type="hidden" name="order_id" value="<?= $order['id'] ?>">
+    <button class="btn btn-secondary btn-sm">Duplicate Order</button>
+  </form>
+</div>
+<?php endif; ?>

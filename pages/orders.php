@@ -133,6 +133,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ?error=Order+update+failed'); exit;
         }
     }
+
+    if ($act === 'duplicate') {
+        $oid = intval($_POST['order_id']);
+        $stmt = $conn->prepare("SELECT * FROM orders WHERE id=?");
+        $stmt->bind_param("i", $oid);
+        $stmt->execute();
+        $orig = $stmt->get_result()->fetch_assoc();
+        if (!$orig) { header('Location: ?error=Order+not+found'); exit; }
+
+        $stmt2 = $conn->prepare("SELECT * FROM order_items WHERE order_id=?");
+        $stmt2->bind_param("i", $oid);
+        $stmt2->execute();
+        $origItems = $stmt2->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        $newOrderNo = generateOrderNo($conn);
+        $stmt3 = $conn->prepare("INSERT INTO orders (order_no, supplier_id, total, status, note, ordered_at) VALUES (?,?,'pending','pending',?,NOW())");
+        $note = "Duplicated from {$orig['order_no']}";
+        $stmt3->bind_param("sis", $newOrderNo, $orig['supplier_id'], $note);
+        $stmt3->execute();
+        $newId = $conn->insert_id;
+
+        $total = 0;
+        foreach ($origItems as $item) {
+            $itot = $item['qty'] * $item['cost'];
+            $total += $itot;
+            $stmt4 = $conn->prepare("INSERT INTO order_items (order_id,product_id,product_name,qty,cost,total) VALUES (?,?,?,?,?,?)");
+            $stmt4->bind_param("iisidd", $newId, $item['product_id'], $item['product_name'], $item['qty'], $item['cost'], $itot);
+            $stmt4->execute();
+        }
+
+        $stmt5 = $conn->prepare("UPDATE orders SET total=? WHERE id=?");
+        $stmt5->bind_param("di", $total, $newId);
+        $stmt5->execute();
+
+        auditLog($conn, 'order_duplicate', 'order', $newId, ['from' => $orig['order_no'], 'to' => $newOrderNo]);
+        header('Location: ?msg=Order+duplicated+as+' . $newOrderNo); exit;
+    }
 }
 
 // CSV Export

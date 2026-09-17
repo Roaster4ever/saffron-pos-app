@@ -7,11 +7,12 @@ requireLogin();
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'refund') {
     if (!csrf_verify()) { header('Location: ?error=Invalid+security+token'); exit; }
     $id = intval($_POST['id']);
-    $stmt = $conn->prepare("SELECT * FROM sales WHERE id=? AND status='completed'");
+    $stmt = $conn->prepare("SELECT *, UNIX_TIMESTAMP(updated_at) as updated_ts FROM sales WHERE id=? AND status='completed'");
     $stmt->bind_param("i", $id);
     $stmt->execute();
     $sale = $stmt->get_result()->fetch_assoc();
     if (!$sale) { header('Location: ?error=Sale+not+found'); exit; }
+    $originalUpdatedTs = $sale['updated_ts'];
 
     // Partial returns support
     $returnItems = json_decode($_POST['return_items'] ?? '[]', true); // [{sale_item_id, qty}]
@@ -103,6 +104,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'refun
             }
 
             auditLog($conn, 'sale_refund', 'sale', $id, ['invoice_no' => $sale['invoice_no']]);
+        }
+
+        // Optimistic lock check: verify sale hasn't been modified by another process
+        $lockCheck = $conn->prepare("SELECT UNIX_TIMESTAMP(updated_at) as ts FROM sales WHERE id=?");
+        $lockCheck->bind_param("i", $id);
+        $lockCheck->execute();
+        $currentTs = $lockCheck->get_result()->fetch_assoc()['ts'];
+        if ($currentTs != $originalUpdatedTs) {
+            $conn->rollback();
+            header('Location: ?error=Sale+was+modified+by+another+user.+Please+try+again.'); exit;
         }
 
         $conn->commit();

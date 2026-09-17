@@ -169,6 +169,8 @@ class DbStmt {
     private $db;
     private $stmt;
     public $num_rows = 0;
+    public $types;
+    public $params;
 
     public function __construct($db, $stmt) {
         $this->db = $db;

@@ -470,3 +470,37 @@ function executeSqlRestore($conn, $sqlContent) {
     }
     return ['success' => empty($errors), 'errors' => $errors];
 }
+
+// ── Input validation helpers ──
+function validateEmail($email) {
+    if (empty($email)) return '';
+    return filter_var($email, FILTER_VALIDATE_EMAIL) ? trim($email) : false;
+}
+
+function validatePhone($phone) {
+    if (empty($phone)) return '';
+    $cleaned = preg_replace('/[^\d+\-\s()]/', '', $phone);
+    if (strlen(preg_replace('/\D/', '', $cleaned)) < 7) return false;
+    return $cleaned;
+}
+
+function validateMoney($val, $max = 99999999.99) {
+    $num = filter_var($val, FILTER_VALIDATE_FLOAT);
+    if ($num === false || $num < 0 || $num > $max) return false;
+    return round($num, 2);
+}
+
+function validateInt($val, $min = null, $max = null) {
+    $num = filter_var($val, FILTER_VALIDATE_INT);
+    if ($num === false) return false;
+    if ($min !== null && $num < $min) return false;
+    if ($max !== null && $num > $max) return false;
+    return $num;
+}
+
+function validateString($val, $maxLen = 255) {
+    if (!is_string($val)) return false;
+    $val = trim($val);
+    if (strlen($val) > $maxLen) return false;
+    return $val;
+}

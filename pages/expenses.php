@@ -8,13 +8,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $act = $_POST['action'] ?? '';
 
     if ($act === 'add') {
-        $title    = trim($_POST['title'] ?? '');
-        $amount   = floatval($_POST['amount'] ?? 0);
+        $title    = validateString($_POST['title'] ?? '', 200);
+        $amount   = validateMoney($_POST['amount'] ?? 0);
         $date     = date('Y-m-d H:i:s');
-        $catId    = intval($_POST['category_id'] ?? 0) ?: null;
-        $note     = trim($_POST['note'] ?? '');
+        $catId    = validateInt($_POST['category_id'] ?? 0, 0, 999999) ?: null;
+        $note     = validateString($_POST['note'] ?? '', 1000);
 
-        if (!$title || $amount <= 0) { header('Location: ?error=Title+and+amount+required'); exit; }
+        if (!$title || $amount === false || $amount <= 0) { header('Location: ?error=Title+and+valid+amount+required'); exit; }
 
         $stmt = $conn->prepare("INSERT INTO expenses (title, amount, category_id, note, user_id) VALUES (?,?,?,?,?)");
         $uid = $_SESSION['user_id'] ?? null;
@@ -25,13 +25,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($act === 'edit') {
-        $id      = intval($_POST['id']);
-        $title   = trim($_POST['title'] ?? '');
-        $amount  = floatval($_POST['amount'] ?? 0);
-        $catId   = intval($_POST['category_id'] ?? 0) ?: null;
-        $note    = trim($_POST['note'] ?? '');
+        $id      = validateInt($_POST['id'] ?? 0, 1);
+        $title   = validateString($_POST['title'] ?? '', 200);
+        $amount  = validateMoney($_POST['amount'] ?? 0);
+        $catId   = validateInt($_POST['category_id'] ?? 0, 0, 999999) ?: null;
+        $note    = validateString($_POST['note'] ?? '', 1000);
 
-        if (!$title || $amount <= 0) { header('Location: ?error=Title+and+amount+required'); exit; }
+        if (!$id || !$title || $amount === false || $amount <= 0) { header('Location: ?error=Invalid+input'); exit; }
 
         $stmt = $conn->prepare("UPDATE expenses SET title=?, amount=?, category_id=?, note=? WHERE id=?");
         $stmt->bind_param("sdssi", $title, $amount, $catId, $note, $id);

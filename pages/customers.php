@@ -8,18 +8,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $act = $_POST['action'] ?? '';
 
     if ($act === 'add') {
-        $name    = trim($_POST['name'] ?? '');
+        $name    = validateString($_POST['name'] ?? '', 200);
         $type    = $_POST['type'] ?? 'individual';
-        $phone   = trim($_POST['phone'] ?? '');
-        $whatsapp= trim($_POST['whatsapp'] ?? '');
-        $email   = trim($_POST['email'] ?? '');
-        $address = trim($_POST['address'] ?? '');
-        $city    = trim($_POST['city'] ?? '');
-        $creditLimit = floatval($_POST['credit_limit'] ?? 0);
-        $openingBalance = floatval($_POST['opening_balance'] ?? 0);
-        $notes   = trim($_POST['notes'] ?? '');
+        $phone   = validatePhone($_POST['phone'] ?? '');
+        $whatsapp= validatePhone($_POST['whatsapp'] ?? '');
+        $email   = validateEmail($_POST['email'] ?? '');
+        $address = validateString($_POST['address'] ?? '', 500);
+        $city    = validateString($_POST['city'] ?? '', 100);
+        $creditLimit = validateMoney($_POST['credit_limit'] ?? 0);
+        $openingBalance = validateMoney($_POST['opening_balance'] ?? 0) ?? 0;
+        $notes   = validateString($_POST['notes'] ?? '', 1000);
 
         if (!$name) { header('Location: ?error=Name+required'); exit; }
+        if ($phone === false) { header('Location: ?error=Invalid+phone+number'); exit; }
+        if ($email === false) { header('Location: ?error=Invalid+email+address'); exit; }
+        if ($creditLimit === false) { header('Location: ?error=Invalid+credit+limit'); exit; }
 
         $stmt = $conn->prepare("INSERT INTO customers_v2 (name,type,phone,whatsapp,email,address,city,credit_limit,opening_balance,notes) VALUES (?,?,?,?,?,?,?,?,?,?)");
         $stmt->bind_param("sssssssdds", $name, $type, $phone, $whatsapp, $email, $address, $city, $creditLimit, $openingBalance, $notes);
@@ -36,19 +39,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($act === 'edit') {
-        $id = intval($_POST['id']);
-        $name    = trim($_POST['name'] ?? '');
+        $id = validateInt($_POST['id'] ?? 0, 1);
+        $name    = validateString($_POST['name'] ?? '', 200);
         $type    = $_POST['type'] ?? 'individual';
-        $phone   = trim($_POST['phone'] ?? '');
-        $whatsapp= trim($_POST['whatsapp'] ?? '');
-        $email   = trim($_POST['email'] ?? '');
-        $address = trim($_POST['address'] ?? '');
-        $city    = trim($_POST['city'] ?? '');
-        $creditLimit = floatval($_POST['credit_limit'] ?? 0);
-        $notes   = trim($_POST['notes'] ?? '');
+        $phone   = validatePhone($_POST['phone'] ?? '');
+        $whatsapp= validatePhone($_POST['whatsapp'] ?? '');
+        $email   = validateEmail($_POST['email'] ?? '');
+        $address = validateString($_POST['address'] ?? '', 500);
+        $city    = validateString($_POST['city'] ?? '', 100);
+        $creditLimit = validateMoney($_POST['credit_limit'] ?? 0);
+        $notes   = validateString($_POST['notes'] ?? '', 1000);
         $active  = isset($_POST['is_active']) ? 1 : 0;
 
-        if (!$name) { header('Location: ?error=Name+required'); exit; }
+        if (!$id || !$name) { header('Location: ?error=Invalid+input'); exit; }
+        if ($phone === false) { header('Location: ?error=Invalid+phone+number'); exit; }
+        if ($email === false) { header('Location: ?error=Invalid+email+address'); exit; }
+        if ($creditLimit === false) { header('Location: ?error=Invalid+credit+limit'); exit; }
 
         $stmt = $conn->prepare("UPDATE customers_v2 SET name=?,type=?,phone=?,whatsapp=?,email=?,address=?,city=?,credit_limit=?,notes=?,is_active=? WHERE id=?");
         $stmt->bind_param("sssssssdssi", $name, $type, $phone, $whatsapp, $email, $address, $city, $creditLimit, $notes, $active, $id);
