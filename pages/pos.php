@@ -56,7 +56,7 @@ include __DIR__ . '/../includes/header.php';
   <!-- RIGHT: Checkout -->
   <div class="pos-panel" style="border-color:var(--accent);border-width:1px">
     <!-- Search Bar -->
-    <div class="pos-search-bar" style="display:flex;gap:8px;align-items:center">
+    <div class="pos-search-bar" style="display:flex;gap:8px;align-items:center;position:relative">
       <input type="text" id="posSearch" class="pos-search" style="flex:1" placeholder="Search product, SKU, barcode + Enter" autocomplete="off">
       <div id="searchResults" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);max-height:300px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.3)"></div>
     </div>
@@ -183,25 +183,60 @@ function showScanToast(msg, ok) {
 
 /* ── AJAX SEARCH ── */
 var _searchTimeout = null;
+var _searchSelectedIdx = -1;
+var _searchResultsData = [];
+
 $id('posSearch').addEventListener('input', function() {
   clearTimeout(_searchTimeout);
+  _searchSelectedIdx = -1;
   var q = this.value.trim();
-  if (q.length < 1) { $id('searchResults').style.display = 'none'; return; }
+  if (q.length < 1) { $id('searchResults').style.display = 'none'; _searchResultsData = []; return; }
   _searchTimeout = setTimeout(function() { ajaxSearch(q); }, 200);
 });
 
 $id('posSearch').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
+  var box = $id('searchResults');
+  var items = box.querySelectorAll('.sr-item');
+  var count = items.length;
+
+  if (e.key === 'ArrowDown') {
     e.preventDefault();
-    var q = this.value.trim();
-    if (q.length >= 1) { handleScannedCode(q); this.value = ''; $id('searchResults').style.display = 'none'; }
+    if (!count) return;
+    _searchSelectedIdx = Math.min(_searchSelectedIdx + 1, count - 1);
+    _highlightSearchResult(items);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!count) return;
+    _searchSelectedIdx = Math.max(_searchSelectedIdx - 1, 0);
+    _highlightSearchResult(items);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (_searchSelectedIdx >= 0 && _searchSelectedIdx < count) {
+      items[_searchSelectedIdx].click();
+    } else {
+      var q = this.value.trim();
+      if (q.length >= 1) { handleScannedCode(q); this.value = ''; box.style.display = 'none'; _searchResultsData = []; }
+    }
+  } else if (e.key === 'Escape') {
+    box.style.display = 'none';
+    _searchSelectedIdx = -1;
+    _searchResultsData = [];
   }
-  if (e.key === 'Escape') { $id('searchResults').style.display = 'none'; }
 });
+
+function _highlightSearchResult(items) {
+  items.forEach(function(el, i) {
+    el.style.background = i === _searchSelectedIdx ? 'var(--bg3)' : '';
+  });
+  if (_searchSelectedIdx >= 0 && items[_searchSelectedIdx]) {
+    items[_searchSelectedIdx].scrollIntoView({ block: 'nearest' });
+  }
+}
 
 document.addEventListener('click', function(e) {
   if (!e.target.closest('#posSearch') && !e.target.closest('#searchResults')) {
     $id('searchResults').style.display = 'none';
+    _searchSelectedIdx = -1;
   }
 });
 
@@ -209,13 +244,14 @@ function ajaxSearch(q) {
   fetch('<?= BASE_URL ?>/pages/pos_search.php?q=' + encodeURIComponent(q))
     .then(function(r) { return r.json(); })
     .then(function(results) {
+      _searchResultsData = results;
+      _searchSelectedIdx = -1;
       if (!results.length) { $id('searchResults').innerHTML = '<div style="padding:12px;text-align:center;color:var(--text2);font-size:12px">No products found</div>'; $id('searchResults').style.display = 'block'; return; }
-      var html = results.map(function(p) {
+      var html = results.map(function(p, i) {
         var stock = p.stock - (p.reserved_stock || 0);
         var disabled = stock <= 0;
-        return '<div onclick="' + (disabled ? '' : 'pickSearchResult(' + JSON.stringify(p).replace(/"/g, '&quot;') + ')') + '" ' +
-          'style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);cursor:' + (disabled ? 'default' : 'pointer') + ';opacity:' + (disabled ? '.4' : '1') + ';transition:background .1s" ' +
-          'onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">' +
+        return '<div class="sr-item" data-idx="' + i + '" onclick="' + (disabled ? '' : 'pickSearchResult(_searchResultsData[' + i + '])') + '" ' +
+          'style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);cursor:' + (disabled ? 'default' : 'pointer') + ';opacity:' + (disabled ? '.4' : '1') + ';transition:background .1s">' +
           '<div><div style="font-weight:600;font-size:13px">' + p.name + '</div>' +
           '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + (p.brand_name || '') + ' &middot; Stock: ' + stock + ' ' + (p.unit_name || 'pc') + '</div></div>' +
           '<div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--accent)">' + fmt(p.price) + '</div></div>';
@@ -542,9 +578,11 @@ function loadDraft(id) {
       }
       renderCart();
       showScanToast('Draft loaded: ' + data.draft_no, true);
-      // Delete the draft
+      // Delete the draft from DB (silently)
       fetch('<?= BASE_URL ?>/pages/pos_draft.php', { method: 'POST', body: (function(){ var f = new FormData(); f.append('csrf_token', CSRF_TOKEN); f.append('action','delete_draft'); f.append('id', id); return f; })() });
-      setTimeout(function() { location.reload(); }, 1000);
+      // Remove the draft button from the drafts list in the DOM
+      var draftBtn = document.querySelector('[onclick="loadDraft(' + id + ')"]');
+      if (draftBtn) draftBtn.remove();
     });
 }
 
