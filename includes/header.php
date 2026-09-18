@@ -90,16 +90,19 @@
       <a href="<?= BASE_URL ?>/pages/sessions.php" class="nav-item <?= ($activePage??'')==='sessions'?'active':'' ?>">
         <span class="nav-icon">&#9881;</span><span>Sessions</span>
       </a>
+      <a href="<?= BASE_URL ?>/pages/audit_log.php" class="nav-item <?= ($activePage??'')==='audit_log'?'active':'' ?>">
+        <span class="nav-icon">&#9881;</span><span>Audit Log</span>
+      </a>
       <?php endif; ?>
     </nav>
     <div class="sidebar-footer">
-      <div class="user-chip">
+      <a href="<?= BASE_URL ?>/pages/profile.php" class="user-chip" style="text-decoration:none;color:inherit">
         <span class="user-avatar"><?= strtoupper(substr($_SESSION['user_name']??'U',0,1)) ?></span>
         <div>
           <div class="user-name"><?= e($_SESSION['user_name']??'') ?></div>
           <div class="user-role"><?= e($_SESSION['user_role']??'') ?></div>
         </div>
-      </div>
+      </a>
       <a href="<?= BASE_URL ?>/logout.php" class="btn-logout">Logout</a>
     </div>
   </aside>
