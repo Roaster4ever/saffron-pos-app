@@ -145,6 +145,7 @@ let lastSale = null;
 let saleType = 'walkin';
 let priceLevel = 'price';
 let selectedCustomer = null;
+let _currentDraftId = null;
 
 /* ── helpers ── */
 function fmt(n) { return CURRENCY + parseFloat(n).toFixed(2); }
@@ -379,7 +380,7 @@ function changeQty(id, delta) {
   renderCart();
 }
 function removeItem(id) { delete cart[id]; renderCart(); }
-function clearCart() { cart = {}; renderCart(); $id('discountInput').value = 0; $id('paidInput').value = 0; updateChange(); }
+function clearCart() { cart = {}; _currentDraftId = null; renderCart(); $id('discountInput').value = 0; $id('paidInput').value = 0; updateChange(); }
 
 function updateTotals() {
   const defaultRate = <?= getSetting('default_tax_rate', 18) ?>;
@@ -565,11 +566,9 @@ function loadDraft(id) {
         setSaleType('customer');
         onCustomerChange();
       }
+      _currentDraftId = id;
       renderCart();
       showScanToast('Draft loaded: ' + data.draft_no, true);
-      // Delete draft from DB and refresh list
-      fetch('<?= BASE_URL ?>/pages/pos_draft.php', { method: 'POST', body: (function(){ var f = new FormData(); f.append('csrf_token', CSRF_TOKEN); f.append('action','delete_draft'); f.append('id', id); return f; })() });
-      refreshDraftsList();
     });
 }
 
@@ -612,6 +611,12 @@ function submitSale() {
       btn.textContent = 'Checkout'; btn.disabled = false;
       if (data.success) {
         lastSale = data;
+        // Delete the draft that was loaded (if any) after successful sale
+        if (_currentDraftId) {
+          fetch('<?= BASE_URL ?>/pages/pos_draft.php', { method: 'POST', body: (function(){ var f = new FormData(); f.append('csrf_token', CSRF_TOKEN); f.append('action','delete_draft'); f.append('id', _currentDraftId); return f; })() });
+          _currentDraftId = null;
+          refreshDraftsList();
+        }
         clearCart();
         showInvoice(data);
       }
