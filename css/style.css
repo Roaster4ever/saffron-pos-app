@@ -308,9 +308,14 @@ select.form-control option{background:var(--bg3);color:var(--text);padding:8px}
    PRINT
    ═══════════════════════════════════════════ */
 @media print{
-  .sidebar,.modal-footer,.btn,.table-toolbar{display:none!important}
+  .sidebar,.modal-footer,.btn,.table-toolbar,.sidebar-footer,.nav-item,.pos-panel,.pos-search-wrap,.pos-cart-actions,.page-header .btn-secondary{display:none!important}
   body,.main-content{background:white;color:black}
   .receipt{max-width:100%;padding:0}
+  .main-content{padding:0;margin:0}
+  table{border-collapse:collapse}
+  thead th{background:#f0f0f0!important;color:black!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .stat-card{border:1px solid #ddd;background:white!important}
+  .alert{display:none!important}
 }
 
 /* ═══════════════════════════════════════════

@@ -869,6 +869,29 @@ document.addEventListener('keydown', function(e) {
 <script>
 /* Load drafts into panel on page load */
 document.addEventListener('DOMContentLoaded', function() { loadDraftsList(); });
+document.addEventListener('keydown', function(e) {
+  if (e.key === '?' && !e.target.matches('input,textarea,select')) {
+    e.preventDefault();
+    var panel = document.getElementById('shortcutsPanel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }
+  if (e.key === 'Escape') {
+    document.getElementById('shortcutsPanel').style.display = 'none';
+  }
+});
 </script>
+
+<!-- Keyboard Shortcuts Panel -->
+<div id="shortcutsPanel" style="display:none;position:fixed;bottom:16px;right:16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;z-index:999;box-shadow:var(--shadow-md);max-width:280px">
+  <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--accent)">Keyboard Shortcuts</div>
+  <div style="font-size:11px;color:var(--text2);line-height:1.8">
+    <div><kbd style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-family:var(--mono);font-size:10px">F2</kbd> Focus search</div>
+    <div><kbd style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-family:var(--mono);font-size:10px">F9</kbd> Quick checkout</div>
+    <div><kbd style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-family:var(--mono);font-size:10px">Ctrl+S</kbd> Save draft</div>
+    <div><kbd style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-family:var(--mono);font-size:10px">Ctrl+Del</kbd> Clear cart</div>
+    <div><kbd style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-family:var(--mono);font-size:10px">Esc</kbd> Close panel</div>
+    <div><kbd style="background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-family:var(--mono);font-size:10px">?</kbd> Toggle this help</div>
+  </div>
+</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
