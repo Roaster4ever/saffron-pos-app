@@ -148,7 +148,7 @@ include __DIR__ . '/includes/header.php';
     <div class="chart-title" style="padding:16px 16px 0">Sales — Last 7 Days</div>
     <div style="flex:1;display:flex;align-items:flex-end;padding:12px 16px 0">
       <div class="bar-chart">
-        <?php foreach($chartData as $d): $h = max(4, round(($d['total']/$maxVal)*240)); $isEmpty = $d['total'] <= 0; ?>
+        <?php foreach($chartData as $d): $h = $d['total'] > 0 ? max(8, round(($d['total']/$maxVal)*240)) : 8; $isEmpty = $d['total'] <= 0; ?>
         <div class="bar-wrap">
           <div class="bar-group">
             <div class="bar-val <?= $isEmpty ? 'text-red' : '' ?>"><?= $isEmpty ? 'Rs:0' : money($d['total']) ?></div>
