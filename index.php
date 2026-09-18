@@ -147,7 +147,7 @@ include __DIR__ . '/includes/header.php';
   <div class="chart-card">
     <div class="chart-title">Sales — Last 7 Days</div>
     <div class="bar-chart">
-      <?php foreach($chartData as $d): $h = max(4, round(($d['total']/$maxVal)*100)); ?>
+      <?php foreach($chartData as $d): $h = max(4, round(($d['total']/$maxVal)*190)); ?>
       <div class="bar-wrap">
         <div class="bar-val"><?= $d['total']>0?money($d['total']):'' ?></div>
         <div class="bar" style="height:<?= $h ?>px"></div>
