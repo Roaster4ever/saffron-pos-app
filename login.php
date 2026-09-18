@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     <div class="login-logo">
       <span class="login-logo-icon">◈</span>
       <div class="login-logo-text"><?= SHOP_NAME ?></div>
-      <div class="text-muted" style="font-size:12px;margin-top:4px">Point of Sale System</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;letter-spacing:.08em;text-transform:uppercase">Point of Sale</div>
     </div>
     <?php if(isset($_GET['msg'])): ?>
       <div class="alert alert-success"><?= e(str_replace('+', ' ', $_GET['msg'])) ?></div>
@@ -102,8 +102,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         <label>Password</label>
         <input type="password" name="password" class="form-control" placeholder="Enter password" required>
       </div>
-      <button type="submit" class="btn btn-primary login-btn">Sign In</button>
+      <button type="submit" class="btn btn-primary login-btn" style="margin-top:8px">Sign In</button>
     </form>
+    <div style="text-align:center;margin-top:20px;font-size:11px;color:var(--text3)">
+      <?= e(getSetting('shop_address', '')) ?>
+    </div>
   </div>
 </div>
 </body>
