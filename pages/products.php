@@ -162,6 +162,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// CSV Export
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+    $products = $conn->query("SELECT p.name, p.sku, p.barcode, p.model, c.name as category, b.name as brand,
+        p.price, p.cost, p.stock, p.min_price, u.short_name as unit, p.low_stock_alert, p.is_active
+        FROM products p
+        LEFT JOIN categories c ON p.category_id=c.id
+        LEFT JOIN brands b ON p.brand_id=b.id
+        LEFT JOIN units u ON p.unit_id=u.id
+        ORDER BY p.name")->fetch_all(MYSQLI_ASSOC);
+    $headers = ['name','sku','barcode','model','category','brand','price','cost','stock','min_price','unit','low_stock_alert','status'];
+    $rows = array_map(function($p) {
+        return array_map('csvEscape', [
+            'name' => $p['name'], 'sku' => $p['sku'] ?? '', 'barcode' => $p['barcode'] ?? '',
+            'model' => $p['model'] ?? '', 'category' => $p['category'] ?? '', 'brand' => $p['brand'] ?? '',
+            'price' => $p['price'], 'cost' => $p['cost'], 'stock' => $p['stock'],
+            'min_price' => $p['min_price'] ?? '', 'unit' => $p['unit'] ?? 'pc',
+            'low_stock_alert' => $p['low_stock_alert'], 'status' => $p['is_active'] ? 'active' : 'inactive',
+        ]);
+    }, $products);
+    auditLog($conn, 'product_csv_export', 'system', null, ['count' => count($rows)]);
+    sendCsvDownload('saffron-products-' . date('Y-m-d') . '.csv', generateCsv($headers, $rows));
+}
+
 $pageTitle = 'Products';
 $activePage = 'products';
 $search = trim($_GET['q'] ?? '');
@@ -207,6 +230,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="page-subtitle"><?= count($products) ?> products</div>
   </div>
   <div style="display:flex;gap:8px">
+    <a href="?export=csv" class="btn btn-secondary btn-sm">Export CSV</a>
     <button class="btn btn-primary" onclick="openInvScanner()">Add / Restock</button>
     <?php if(isAdmin()): ?><button class="btn btn-secondary" onclick="openModal('addModal')">+ New Product</button><?php endif; ?>
   </div>

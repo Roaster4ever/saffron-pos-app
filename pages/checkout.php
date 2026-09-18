@@ -118,8 +118,8 @@ $uid = $_SESSION['user_id'] ?? null;
 $conn->begin_transaction();
 try {
     // ── Insert sale record ──
-    $stmt = $conn->prepare("INSERT INTO sales (invoice_no, customer_id, customer_v2_id, user_id, subtotal, discount, tax, total, paid, change_amount, payment_method, outstanding) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("siiddddddsd", $invoice, $customerId, $uid, $subtotal, $discount, $totalTax, $total, $paid, $change, $payment, $outstanding);
+    $stmt = $conn->prepare("INSERT INTO sales (invoice_no, customer_v2_id, user_id, subtotal, discount, tax, total, paid, change_amount, payment_method, outstanding) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("siddddddsd", $invoice, $customerId, $uid, $subtotal, $discount, $totalTax, $total, $paid, $change, $payment, $outstanding);
     $stmt->execute();
     $saleId = $conn->insert_id;
 
@@ -139,10 +139,15 @@ try {
         $stmt2->bind_param("iisdsdddd", $saleId, $pid, $name, $qty, $unit, $price, $itot, $itemTax, $itemGstRate);
         $stmt2->execute();
 
-        // Deduct stock
-        $stmt3 = $conn->prepare("UPDATE products SET stock = stock - ? WHERE id = ?");
-        $stmt3->bind_param("di", $qty, $pid);
+        // Deduct stock (atomic: only deduct if stock is sufficient)
+        $stmt3 = $conn->prepare("UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?");
+        $stmt3->bind_param("did", $qty, $pid, $qty);
         $stmt3->execute();
+        if ($stmt3->affected_rows === 0) {
+            $conn->rollback();
+            echo json_encode(['success' => false, 'error' => 'Insufficient stock for ' . ($item['_server_name'] ?? 'product') . ' (race condition prevented)']);
+            exit;
+        }
 
         // Log inventory movement
         logInventoryMovement($conn, $pid, -$qty, 'sale', 'sale', "Invoice $invoice");

@@ -3,7 +3,7 @@ require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 
-$customerId = intval($_GET['id'] ?? $_POST['id'] ?? 0);
+$customerId = intval($_GET['id'] ?? $_GET['customer_id'] ?? $_POST['id'] ?? 0);
 if (!$customerId) { header('Location: customers.php'); exit; }
 
 // Fetch customer
