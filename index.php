@@ -150,8 +150,10 @@ include __DIR__ . '/includes/header.php';
       <div class="bar-chart">
         <?php foreach($chartData as $d): $h = max(4, round(($d['total']/$maxVal)*100)); ?>
         <div class="bar-wrap">
-          <div class="bar-val"><?= $d['total']>0?money($d['total']):'' ?></div>
-          <div class="bar" style="height:<?= $h ?>%"></div>
+          <div class="bar-group">
+            <div class="bar-val"><?= $d['total']>0?money($d['total']):'' ?></div>
+            <div class="bar" style="height:<?= $h ?>%"></div>
+          </div>
           <div class="bar-label"><?= $d['date'] ?></div>
         </div>
         <?php endforeach; ?>
