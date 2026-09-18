@@ -32,10 +32,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
 
 // List all drafts for current user
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['action']) && $_GET['action'] === 'list')) {
-    $stmt = $conn->prepare("SELECT id, draft_no, customer_name, total, item_count, DATE_FORMAT(created_at, '%d/%m %H:%i') as created_at FROM pos_drafts WHERE user_id=? ORDER BY created_at DESC LIMIT 30");
+    $stmt = $conn->prepare("SELECT id, draft_no, customer_name, total, item_count, items_json, DATE_FORMAT(created_at, '%d/%m %H:%i') as created_at FROM pos_drafts WHERE user_id=? ORDER BY created_at DESC LIMIT 30");
     $stmt->bind_param("i", $userId);
     $stmt->execute();
-    $drafts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $drafts = array_map(function($d) {
+        $items = json_decode($d['items_json'] ?? '[]', true);
+        $itemNames = array_map(function($i) { return $i['product_name'] ?? ''; }, $items ?? []);
+        unset($d['items_json']);
+        $d['items_text'] = implode(' ', $itemNames);
+        return $d;
+    }, $rows);
     echo json_encode($drafts);
     exit;
 }

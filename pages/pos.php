@@ -44,8 +44,9 @@ include __DIR__ . '/../includes/header.php';
 
   <!-- LEFT: Drafts Panel -->
   <div class="pos-panel" id="draftsPanel" style="overflow-y:auto">
-    <div class="pos-search-bar" style="border-bottom:1px solid var(--border);padding:10px 12px">
-      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">Drafts</div>
+    <div style="padding:8px 10px;border-bottom:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Drafts</div>
+      <input type="text" id="draftSearch" class="pos-search" style="font-size:11px;padding:5px 8px" placeholder="Search drafts..." autocomplete="off" oninput="filterDrafts()">
     </div>
     <div id="draftsList" style="padding:6px;display:flex;flex-direction:column;gap:4px">
       <div class="empty-state" style="padding:20px 8px;font-size:11px"><div class="empty-icon">&#9998;</div>No saved drafts</div>
@@ -620,26 +621,48 @@ function submitSale() {
 }
 
 /* ── DRAFTS PANEL ── */
+var _allDrafts = [];
+
 function loadDraftsList() {
   fetch('<?= BASE_URL ?>/pages/pos_draft.php?action=list')
     .then(function(r) { return r.json(); })
     .then(function(drafts) {
-      var container = $id('draftsList');
-      if (!drafts.length) {
-        container.innerHTML = '<div class="empty-state" style="padding:20px 8px;font-size:11px"><div class="empty-icon">&#9998;</div>No saved drafts</div>';
-        return;
-      }
-      container.innerHTML = drafts.map(function(d) {
-        return '<button onclick="loadDraft(' + d.id + ')" style="display:flex;flex-direction:column;gap:2px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;text-align:left;width:100%;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center">' +
-            '<span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text)">' + d.draft_no + '</span>' +
-            '<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent)">' + CURRENCY + parseFloat(d.total).toFixed(2) + '</span>' +
-          '</div>' +
-          '<div style="font-size:10px;color:var(--text3)">' + (d.customer_name || 'Walk-in') + ' &middot; ' + d.item_count + ' items</div>' +
-          '<div style="font-size:10px;color:var(--text3)">' + d.created_at + '</div>' +
-        '</button>';
-      }).join('');
+      _allDrafts = drafts;
+      renderDraftsList(drafts);
     });
+}
+
+function renderDraftsList(drafts) {
+  var container = $id('draftsList');
+  if (!drafts.length) {
+    var q = ($id('draftSearch').value || '').trim();
+    container.innerHTML = q
+      ? '<div class="empty-state" style="padding:20px 8px;font-size:11px">No matching drafts</div>'
+      : '<div class="empty-state" style="padding:20px 8px;font-size:11px"><div class="empty-icon">&#9998;</div>No saved drafts</div>';
+    return;
+  }
+  container.innerHTML = drafts.map(function(d) {
+    return '<button onclick="loadDraft(' + d.id + ')" style="display:flex;flex-direction:column;gap:2px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;text-align:left;width:100%;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text)">' + d.draft_no + '</span>' +
+        '<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent)">' + CURRENCY + parseFloat(d.total).toFixed(2) + '</span>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--text3)">' + (d.customer_name || 'Walk-in') + ' &middot; ' + d.item_count + ' items</div>' +
+      '<div style="font-size:10px;color:var(--text3)">' + d.created_at + '</div>' +
+    '</button>';
+  }).join('');
+}
+
+function filterDrafts() {
+  var q = ($id('draftSearch').value || '').trim().toLowerCase();
+  if (!q) { renderDraftsList(_allDrafts); return; }
+  var filtered = _allDrafts.filter(function(d) {
+    if ((d.draft_no || '').toLowerCase().includes(q)) return true;
+    if ((d.customer_name || '').toLowerCase().includes(q)) return true;
+    if ((d.items_text || '').toLowerCase().includes(q)) return true;
+    return false;
+  });
+  renderDraftsList(filtered);
 }
 
 function refreshDraftsList() { loadDraftsList(); }
