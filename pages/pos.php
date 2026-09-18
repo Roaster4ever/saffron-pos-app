@@ -552,11 +552,19 @@ function loadDraft(id) {
       if (!data.success) { alert(data.error || 'Draft not found'); return; }
       cart = {};
       data.items.forEach(function(item) {
-        cart[item.product_id] = {
-          id: item.product_id, name: item.product_name, price: parseFloat(item.price),
-          cost: parseFloat(item.cost) || 0, minPrice: 0, qty: parseFloat(item.qty),
-          stock: 99999, unit: item.unit || 'pc', tax_mode: item.tax_mode || 'default',
-          gst_rate: parseFloat(item.gst_rate) || 0, taxable: parseInt(item.taxable) || 0,
+        var pid = item.product_id || item.id;
+        cart[pid] = {
+          id: parseInt(pid),
+          name: item.product_name || item.name || 'Unknown',
+          price: parseFloat(item.price) || 0,
+          cost: parseFloat(item.cost) || 0,
+          minPrice: parseFloat(item.min_price || item.minPrice) || 0,
+          qty: parseFloat(item.qty) || 1,
+          stock: parseFloat(item.stock) || 99999,
+          unit: item.unit || 'pc',
+          tax_mode: item.tax_mode || 'default',
+          gst_rate: parseFloat(item.gst_rate) || 0,
+          taxable: parseInt(item.taxable) || 0,
           selling_mode: item.selling_mode || 'fixed'
         };
       });

@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['action']) && $_GET['ac
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $drafts = array_map(function($d) {
         $items = json_decode($d['items_json'] ?? '[]', true);
-        $itemNames = array_map(function($i) { return $i['product_name'] ?? ''; }, $items ?? []);
+        $itemNames = array_map(function($i) { return $i['product_name'] ?? $i['name'] ?? ''; }, $items ?? []);
         unset($d['items_json']);
         $d['items_text'] = implode(' ', $itemNames);
         return $d;
