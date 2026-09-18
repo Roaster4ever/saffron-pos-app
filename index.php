@@ -148,11 +148,11 @@ include __DIR__ . '/includes/header.php';
     <div class="chart-title" style="padding:16px 16px 0">Sales — Last 7 Days</div>
     <div style="flex:1;display:flex;align-items:flex-end;padding:12px 16px 0">
       <div class="bar-chart">
-        <?php foreach($chartData as $d): $h = max(4, round(($d['total']/$maxVal)*240)); ?>
+        <?php foreach($chartData as $d): $h = max(4, round(($d['total']/$maxVal)*240)); $isEmpty = $d['total'] <= 0; ?>
         <div class="bar-wrap">
           <div class="bar-group">
-            <div class="bar-val"><?= $d['total']>0?money($d['total']):'' ?></div>
-            <div class="bar" style="height:<?= $h ?>px"></div>
+            <div class="bar-val <?= $isEmpty ? 'text-red' : '' ?>"><?= $isEmpty ? 'Rs:0' : money($d['total']) ?></div>
+            <div class="bar <?= $isEmpty ? 'bar-empty' : '' ?>" style="height:<?= $h ?>px"></div>
           </div>
           <div class="bar-label"><?= $d['date'] ?></div>
         </div>
