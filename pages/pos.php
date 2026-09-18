@@ -380,7 +380,7 @@ function changeQty(id, delta) {
   renderCart();
 }
 function removeItem(id) { delete cart[id]; renderCart(); }
-function clearCart() { cart = {}; _currentDraftId = null; renderCart(); $id('discountInput').value = 0; $id('paidInput').value = 0; updateChange(); }
+function clearCart() { cart = {}; _currentDraftId = null; renderCart(); renderDraftsList(_allDrafts); $id('discountInput').value = 0; $id('paidInput').value = 0; updateChange(); }
 
 function updateTotals() {
   const defaultRate = <?= getSetting('default_tax_rate', 18) ?>;
@@ -527,17 +527,24 @@ function saveDraft() {
   if (!Object.keys(cart).length) { alert('Cart is empty!'); return; }
   var fd = new FormData();
   fd.append('csrf_token', CSRF_TOKEN);
-  fd.append('action', 'save_draft');
   fd.append('cart', JSON.stringify(Object.values(cart)));
   fd.append('discount', $id('discountInput').value || '0');
   fd.append('customer_id', selectedCustomer ? selectedCustomer.id : '');
   fd.append('payment_method', $id('paymentMethod').value);
 
+  var isUpdate = !!_currentDraftId;
+  if (isUpdate) {
+    fd.append('action', 'update_draft');
+    fd.append('draft_id', _currentDraftId);
+  } else {
+    fd.append('action', 'save_draft');
+  }
+
   fetch('<?= BASE_URL ?>/pages/pos_draft.php', { method: 'POST', body: fd })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.success) {
-        showScanToast('Draft saved: ' + data.draft_no, true);
+        showScanToast(isUpdate ? 'Draft updated' : 'Draft saved: ' + data.draft_no, true);
         clearCart();
         refreshDraftsList();
       } else alert('Error: ' + data.error);
@@ -576,6 +583,7 @@ function loadDraft(id) {
       }
       _currentDraftId = id;
       renderCart();
+      renderDraftsList(_allDrafts);
       showScanToast('Draft loaded: ' + data.draft_no, true);
     });
 }
@@ -655,7 +663,10 @@ function renderDraftsList(drafts) {
     return;
   }
   container.innerHTML = drafts.map(function(d) {
-    return '<button onclick="loadDraft(' + d.id + ')" style="display:flex;flex-direction:column;gap:2px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;text-align:left;width:100%;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
+    var isActive = _currentDraftId === d.id;
+    var borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+    var bgColor = isActive ? 'rgba(232,255,58,.08)' : 'var(--bg3)';
+    return '<button onclick="loadDraft(' + d.id + ')" data-draft-id="' + d.id + '" style="display:flex;flex-direction:column;gap:2px;padding:8px 10px;background:' + bgColor + ';border:1px solid ' + borderColor + ';border-radius:var(--radius);cursor:pointer;text-align:left;width:100%;transition:border-color .15s,background .15s" onmouseover="if(!this.classList.contains(\'active-draft\'))this.style.borderColor=\'var(--accent)\'" onmouseout="if(!this.classList.contains(\'active-draft\'))this.style.borderColor=\'' + borderColor + '\'">' +
       '<div style="display:flex;justify-content:space-between;align-items:center">' +
         '<span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text)">' + d.draft_no + '</span>' +
         '<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent)">' + CURRENCY + parseFloat(d.total).toFixed(2) + '</span>' +

@@ -97,6 +97,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($act === 'update_draft') {
+        $draftId = intval($_POST['draft_id']);
+        $cart = json_decode($_POST['cart'] ?? '[]', true);
+        if (empty($cart)) { echo json_encode(['success' => false, 'error' => 'Cart is empty']); exit; }
+
+        $discount = max(0, floatval($_POST['discount'] ?? 0));
+        $customerId = intval($_POST['customer_id'] ?? 0) ?: null;
+        $paymentMethod = $_POST['payment_method'] ?? 'cash';
+
+        $customerName = '';
+        if ($customerId) {
+            $cstmt = $conn->prepare("SELECT name FROM customers_v2 WHERE id=?");
+            $cstmt->bind_param("i", $customerId);
+            $cstmt->execute();
+            $customerName = $cstmt->get_result()->fetch_assoc()['name'] ?? '';
+        }
+
+        $subtotal = 0;
+        $taxTotal = 0;
+        $defaultRate = getSetting('default_tax_rate', 18);
+        $itemCount = 0;
+        foreach ($cart as $item) {
+            $lineTotal = floatval($item['price']) * floatval($item['qty']);
+            $subtotal += $lineTotal;
+            $taxMode = $item['tax_mode'] ?? 'default';
+            $rate = $taxMode === 'non_taxable' ? 0 : ($taxMode === 'custom' ? floatval($item['gst_rate'] ?? 0) : $defaultRate);
+            $taxTotal += $lineTotal * $rate / 100;
+            $itemCount++;
+        }
+        $total = max(0, $subtotal + $taxTotal - $discount);
+
+        $itemsJson = json_encode(array_values($cart));
+        $stmt = $conn->prepare("UPDATE pos_drafts SET customer_id=?, customer_name=?, subtotal=?, discount=?, tax=?, total=?, payment_method=?, item_count=?, items_json=? WHERE id=? AND user_id=?");
+        $stmt->bind_param("isddddsiiii", $customerId, $customerName, $subtotal, $discount, $taxTotal, $total, $paymentMethod, $itemCount, $itemsJson, $draftId, $userId);
+        $stmt->execute();
+
+        echo json_encode(['success' => true, 'id' => $draftId]);
+        exit;
+    }
+
     if ($act === 'delete_draft') {
         $id = intval($_POST['id']);
         $stmt = $conn->prepare("DELETE FROM pos_drafts WHERE id=? AND user_id=?");
