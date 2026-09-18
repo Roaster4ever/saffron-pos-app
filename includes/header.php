@@ -81,6 +81,9 @@
       <a href="<?= BASE_URL ?>/pages/tax_bulk.php" class="nav-item <?= ($activePage??'')==='tax_bulk'?'active':'' ?>">
         <span class="nav-icon">&#37;</span><span>Tax Settings</span>
       </a>
+      <a href="<?= BASE_URL ?>/pages/settings.php" class="nav-item <?= ($activePage??'')==='settings'?'active':'' ?>">
+        <span class="nav-icon">&#9881;</span><span>Settings</span>
+      </a>
       <a href="<?= BASE_URL ?>/pages/data_management.php" class="nav-item <?= ($activePage??'')==='data_management'?'active':'' ?>">
         <span class="nav-icon">&#9881;</span><span>Data & Backup</span>
       </a>

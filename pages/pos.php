@@ -62,7 +62,9 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <!-- Sale Type / Customer Selection -->
+    <?php $showCustomers = (bool)getSetting('pos_customer_profiles', true); ?>
     <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+      <?php if ($showCustomers): ?>
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <button class="cat-tab active" id="saleTypeWalkin" onclick="setSaleType('walkin')">Walk-in</button>
         <button class="cat-tab" id="saleTypeCustomer" onclick="setSaleType('customer')">Customer</button>
@@ -76,6 +78,9 @@ include __DIR__ . '/../includes/header.php';
         </select>
         <div id="customerInfo" style="display:none;font-size:11px;color:var(--text2);margin-top:4px"></div>
       </div>
+      <?php else: ?>
+      <input type="hidden" id="customerId" value="">
+      <?php endif; ?>
       <!-- Price Level -->
       <div style="display:flex;gap:4px;margin-top:6px">
         <button class="cat-tab active" data-prl="price" onclick="setPriceLevel('price',this)">Retail</button>
