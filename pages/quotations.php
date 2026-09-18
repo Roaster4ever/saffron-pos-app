@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($act === 'convert') {
         // Convert quotation to sale
         $id = intval($_POST['id']);
-        $stmt = $conn->prepare("SELECT q.*, GROUP_CONCAT(qi.product_id) product_ids, GROUP_CONCAT(qi.qty) qtys, GROUP_CONCAT(qi.price) prices, GROUP_CONCAT(qi.product_name) names, GROUP_CONCAT(qi.unit) units FROM quotations q JOIN quotation_items qi ON q.id=qi.quotation_id WHERE q.id=?");
+        $stmt = $conn->prepare("SELECT q.*, GROUP_CONCAT(qi.product_id) product_ids, GROUP_CONCAT(qi.qty) qtys, GROUP_CONCAT(qi.price) prices, GROUP_CONCAT(qi.product_name) names, GROUP_CONCAT(qi.unit) units, GROUP_CONCAT(qi.tax_amount) tax_amounts, GROUP_CONCAT(qi.gst_rate) gst_rates FROM quotations q JOIN quotation_items qi ON q.id=qi.quotation_id WHERE q.id=?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
         $quo = $stmt->get_result()->fetch_assoc();
@@ -102,6 +102,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $prices = explode(',', $quo['prices']);
         $names = explode(',', $quo['names']);
         $units = explode(',', $quo['units']);
+        $taxAmounts = explode(',', $quo['tax_amounts']);
+        $gstRates = explode(',', $quo['gst_rates']);
 
         // Validate stock availability before conversion
         $stockErrors = [];
@@ -147,15 +149,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $name = $names[$i];
                 $unit = $units[$i];
                 $itot = $price * $qty;
+                $itemTax = floatval($taxAmounts[$i] ?? 0);
+                $itemGst = floatval($gstRates[$i] ?? 0);
 
-                $stmt3 = $conn->prepare("INSERT INTO sale_items (sale_id, product_id, product_name, qty, unit, price, total) VALUES (?,?,?,?,?,?,?)");
-                $stmt3->bind_param("iisdsdd", $saleId, $pid, $name, $qty, $unit, $price, $itot);
+                $stmt3 = $conn->prepare("INSERT INTO sale_items (sale_id, product_id, product_name, qty, unit, price, total, tax_amount, gst_rate) VALUES (?,?,?,?,?,?,?,?,?)");
+                $stmt3->bind_param("iisdsdddd", $saleId, $pid, $name, $qty, $unit, $price, $itot, $itemTax, $itemGst);
                 $stmt3->execute();
 
                 if ($pid) {
-                    $stmt4 = $conn->prepare("UPDATE products SET stock=stock-? WHERE id=?");
-                    $stmt4->bind_param("di", $qty, $pid);
+                    $stmt4 = $conn->prepare("UPDATE products SET stock=stock-? WHERE id=? AND stock>=?");
+                    $stmt4->bind_param("did", $qty, $pid, $qty);
                     $stmt4->execute();
+                    if ($stmt4->affected_rows === 0) {
+                        $conn->rollback();
+                        header('Location: ?error=Insufficient+stock+for+' . urlencode($name));
+                        exit;
+                    }
                     logInventoryMovement($conn, $pid, -$qty, 'sale', 'sale', "Quotation $quo[quotation_no] converted");
                 }
             }
@@ -352,7 +361,7 @@ include __DIR__ . '/../includes/header.php';
 <script>
 var QUO_PRODUCTS = <?= json_encode($products) ?>;
 var QUO_BRANDS = <?= json_encode($brands) ?>;
-var CURRENCY_Q = '<?= addslashes(CURRENCY) ?>';
+var CURRENCY_Q = <?= json_encode(CURRENCY) ?>;
 var quoItems = [];
 
 function onQuoProdChange() {

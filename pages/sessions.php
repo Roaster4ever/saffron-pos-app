@@ -129,11 +129,11 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
-var SESSIONS_FROM   = '<?= addslashes($from) ?>';
-var SESSIONS_TO     = '<?= addslashes($to) ?>';
+var SESSIONS_FROM   = <?= json_encode($from) ?>;
+var SESSIONS_TO     = <?= json_encode($to) ?>;
 var SESSIONS_UID    = <?= $userFilter ?>;
-var SESSIONS_ROLE   = '<?= addslashes($roleFilter) ?>';
-var SESSIONS_STATUS = '<?= addslashes($statusFilter) ?>';
+var SESSIONS_ROLE   = <?= json_encode($roleFilter) ?>;
+var SESSIONS_STATUS = <?= json_encode($statusFilter) ?>;
 
 function buildSessionRow(s, i) {
   var roleBadge = s.user_role === 'admin' ? 'badge-orange' : 'badge-blue';

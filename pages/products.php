@@ -433,7 +433,7 @@ include __DIR__ . '/../includes/header.php';
 
 <script>
 var INV_PRODUCTS = <?= json_encode(array_values($products)) ?>;
-var CURRENCY = '<?= addslashes(CURRENCY) ?>';
+var CURRENCY = <?= json_encode(CURRENCY) ?>;
 
 function openEdit(p) {
   document.getElementById('prodModalTitle').textContent = 'Edit Product';

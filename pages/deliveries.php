@@ -303,7 +303,7 @@ var PRODUCTS = [
   $allProducts = $conn->query("SELECT id, name, sku, stock, unit_id FROM products WHERE is_active=1 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
   foreach ($allProducts as $i => $p):
     if ($i > 0) echo ',';
-    echo '{id:'.$p['id'].',name:"'.addslashes($p['name']).'",sku:"'.addslashes($p['sku'] ?? '').'",stock:'.$p['stock'].'}';
+    echo json_encode(['id' => $p['id'], 'name' => $p['name'], 'sku' => $p['sku'] ?? '', 'stock' => $p['stock']]);
   endforeach;
   ?>
 ];

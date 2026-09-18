@@ -474,7 +474,7 @@ function submitPartialRefund() {
 
 <script src="<?= BASE_URL ?>/js/pie-chart.js"></script>
 <script>
-var CURRENCY_SALES = '<?= addslashes(CURRENCY) ?>';
+var CURRENCY_SALES = <?= json_encode(CURRENCY) ?>;
 renderPieChart('paymentPieChart', [
   { label: 'Cash', value: <?= floatval($paymentStats['cash']['total'] ?? 0) ?> },
   { label: 'Card', value: <?= floatval($paymentStats['card']['total'] ?? 0) ?> },

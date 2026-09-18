@@ -142,7 +142,7 @@ include __DIR__ . '/../includes/header.php';
 <script>
 const TAX_RATE  = <?= TAX_RATE ?>;
 const CURRENCY  = '<?= CURRENCY ?>';
-const SHOP_NAME = '<?= addslashes(SHOP_NAME) ?>';
+const SHOP_NAME = <?= json_encode(SHOP_NAME) ?>;
 const CSRF_TOKEN = '<?= csrf_token() ?>';
 
 let cart = {};
@@ -743,7 +743,7 @@ function showInvoice(s) {
         '<div style="display:flex;justify-content:space-between;padding:3px 0;color:#555;font-size:12px"><span>Change</span><span>' + c + parseFloat(s.change).toFixed(2) + '</span></div>' : '') +
       (s.outstanding > 0 ? '<div style="display:flex;justify-content:space-between;padding:3px 0;color:#c00;font-size:12px;font-weight:600"><span>Outstanding</span><span>' + c + parseFloat(s.outstanding).toFixed(2) + '</span></div>' : '') +
     '</div>' +
-    '<div style="text-align:center;margin-top:22px;padding-top:12px;border-top:1px dashed #ccc;font-size:11px;color:#999"><?= addslashes(INVOICE_FOOTER) ?></div>' +
+    '<div style="text-align:center;margin-top:22px;padding-top:12px;border-top:1px dashed #ccc;font-size:11px;color:#999">' + <?= json_encode(INVOICE_FOOTER) ?> + '</div>' +
   '</div>';
 
   $id('invoiceModal').classList.add('open');
