@@ -44,6 +44,20 @@ $topProfit = $stmtProfit->get_result()->fetch_all(MYSQLI_ASSOC);
 // 7. Inventory value
 $stockValue = $conn->query("SELECT COUNT(*) products, COALESCE(SUM(stock),0) total_units, COALESCE(SUM(cost * stock),0) cost_value, COALESCE(SUM(price * stock),0) retail_value FROM products WHERE is_active=1")->fetch_assoc();
 
+// 8. Refunds/Returns
+$stmtRefund = $conn->prepare("SELECT s.invoice_no, COALESCE(cv.name,'Walk-in') cust_name, s.total, s.paid, s.payment_method, s.status, s.created_at FROM sales s LEFT JOIN customers_v2 cv ON s.customer_v2_id=cv.id WHERE DATE(s.created_at) BETWEEN ? AND ? AND s.status='refunded' ORDER BY s.created_at DESC");
+$stmtRefund->bind_param("ss", $from, $to);
+$stmtRefund->execute();
+$refundedSales = $stmtRefund->get_result()->fetch_all(MYSQLI_ASSOC);
+$refundTotal = array_sum(array_column($refundedSales, 'total'));
+$refundCount = count($refundedSales);
+
+// 9. Partial returns (audit log entries)
+$stmtPartial = $conn->prepare("SELECT al.*, u.name as user_name FROM audit_log al LEFT JOIN users u ON al.user_id=u.id WHERE al.action IN ('sale_refund','sale_partial_refund') AND DATE(al.created_at) BETWEEN ? AND ? ORDER BY al.created_at DESC");
+$stmtPartial->bind_param("ss", $from, $to);
+$stmtPartial->execute();
+$refundLog = $stmtPartial->get_result()->fetch_all(MYSQLI_ASSOC);
+
 // 8. Daily trend
 $dailyTrend = [];
 for ($i = 29; $i >= 0; $i--) {
@@ -170,5 +184,51 @@ include __DIR__ . '/../includes/header.php';
     </div>
   </div>
 </div>
+
+<!-- Returns & Refunds -->
+<div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px">
+  <div class="stat-card"><div class="stat-label">Total Refunds</div><div class="stat-value" style="color:var(--red)"><?= money($refundTotal) ?></div><div class="stat-sub"><?= $refundCount ?> invoice<?= $refundCount !== 1 ? 's' : '' ?> refunded</div></div>
+  <div class="stat-card"><div class="stat-label">Net Revenue</div><div class="stat-value" style="color:var(--green)"><?= money($pl['revenue'] - $refundTotal) ?></div><div class="stat-sub">Revenue minus refunds</div></div>
+  <div class="stat-card"><div class="stat-label">Refund Rate</div><div class="stat-value"><?= $pl['revenue'] > 0 ? round(($refundTotal / $pl['revenue']) * 100, 1) : 0 ?>%</div><div class="stat-sub">of gross revenue</div></div>
+</div>
+
+<?php if ($refundedSales): ?>
+<div class="table-card" style="margin-bottom:16px">
+  <div class="table-toolbar"><strong style="font-size:13px">Refunded Invoices</strong></div>
+  <table>
+    <thead><tr><th>Invoice</th><th>Customer</th><th>Total</th><th>Payment</th><th>Date</th></tr></thead>
+    <tbody>
+    <?php foreach ($refundedSales as $rs): ?>
+      <tr>
+        <td class="text-mono text-accent" style="font-size:12px"><?= e($rs['invoice_no']) ?></td>
+        <td style="font-size:12px"><?= e($rs['cust_name']) ?></td>
+        <td class="text-mono text-red" style="font-size:12px"><?= money($rs['total']) ?></td>
+        <td style="text-transform:capitalize;font-size:12px"><?= e(str_replace('_', ' ', $rs['payment_method'])) ?></td>
+        <td class="text-muted" style="font-size:12px"><?= date('d/m/Y H:i', strtotime($rs['created_at'])) ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+<?php endif; ?>
+
+<?php if ($refundLog): ?>
+<div class="table-card" style="margin-bottom:16px">
+  <div class="table-toolbar"><strong style="font-size:13px">Refund Activity Log</strong></div>
+  <table>
+    <thead><tr><th>Date</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
+    <tbody>
+    <?php foreach ($refundLog as $rl): ?>
+      <tr>
+        <td class="text-muted" style="font-size:11px"><?= date('d/m/Y H:i', strtotime($rl['created_at'])) ?></td>
+        <td style="font-size:12px"><?= e($rl['user_name'] ?? 'System') ?></td>
+        <td><span class="badge badge-orange" style="font-size:10px"><?= e($rl['action']) ?></span></td>
+        <td style="font-size:11px"><?= e($rl['new_values'] ?? '—') ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+<?php endif; ?>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -397,20 +397,20 @@ function openPartialRefund(saleId) {
   fetch('<?= BASE_URL ?>/pages/sale_detail.php?id=' + saleId)
     .then(function(r) { return r.text(); })
     .then(function(html) {
-      // Parse the detail HTML to extract items
+      // Parse the detail HTML to extract items from receipt-row divs with data-item-id
       var parser = new DOMParser();
       var doc = parser.parseFromString(html, 'text/html');
-      var rows = doc.querySelectorAll('tbody tr');
+      var rows = doc.querySelectorAll('.receipt-row[data-item-id]');
       var items = [];
       rows.forEach(function(row) {
-        var cells = row.querySelectorAll('td');
-        if (cells.length >= 3) {
-          var name = cells[0].textContent.trim();
-          var qtyText = cells[1].textContent.trim();
-          var qty = parseInt(qtyText) || 0;
-          // Try to extract item id from data attribute or onclick
-          var itemId = row.getAttribute('data-item-id') || row.dataset.itemId;
-          if (qty > 0 && name) {
+        var itemId = row.getAttribute('data-item-id');
+        // Parse text like "Product Name ×2 pc" (&times; renders as ×)
+        var text = row.querySelector('span:first-child').textContent.trim();
+        var match = text.match(/(.+?)\s*[x×]([\d.]+)/);
+        if (match && itemId) {
+          var name = match[1].trim();
+          var qty = parseFloat(match[2]) || 0;
+          if (qty > 0) {
             items.push({ name: name, qty: qty, soldQty: qty, itemId: itemId });
           }
         }

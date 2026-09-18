@@ -48,5 +48,8 @@ $items = $stmt2->get_result()->fetch_all(MYSQLI_ASSOC);
     <div class="receipt-row" style="font-weight:700;color:var(--red)"><span>Outstanding:</span><span><?= money($sale['outstanding']) ?></span></div>
   <?php endif; ?>
   <hr class="receipt-divider">
+  <?php if ($sale['status'] === 'refunded'): ?>
+    <div style="text-align:center;padding:8px;background:rgba(255,74,74,.1);border:1px solid var(--red);border-radius:4px;margin-bottom:8px;font-size:12px;font-weight:700;color:var(--red)">REFUNDED</div>
+  <?php endif; ?>
   <div class="receipt-footer">Status: <?= strtoupper($sale['status']) ?><br><?= INVOICE_FOOTER ?></div>
 </div>
