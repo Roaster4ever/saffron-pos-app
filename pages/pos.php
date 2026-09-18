@@ -40,20 +40,19 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- POS LAYOUT -->
-<div class="pos-layout" style="grid-template-columns:1fr 420px">
+<div class="pos-layout" style="grid-template-columns:200px 1fr;height:calc(100vh - 96px)">
 
-  <!-- LEFT: Cart List (receipt history after checkout) -->
-  <div class="pos-panel" id="receiptPanel">
-    <div class="pos-search-bar">
-      <div style="font-size:13px;font-weight:700;color:var(--text2)">Cart List</div>
-      <div style="font-size:11px;color:var(--text3)">Items appear here after checkout</div>
+  <!-- LEFT: Drafts Panel -->
+  <div class="pos-panel" id="draftsPanel" style="overflow-y:auto">
+    <div class="pos-search-bar" style="border-bottom:1px solid var(--border);padding:10px 12px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">Drafts</div>
     </div>
-    <div class="cart-items" id="receiptItems">
-      <div class="empty-state"><div class="empty-icon">&#9723;</div>Empty — complete a sale to see items here</div>
+    <div id="draftsList" style="padding:6px;display:flex;flex-direction:column;gap:4px">
+      <div class="empty-state" style="padding:20px 8px;font-size:11px"><div class="empty-icon">&#9998;</div>No saved drafts</div>
     </div>
   </div>
 
-  <!-- RIGHT: Checkout -->
+  <!-- RIGHT: Checkout (full width) -->
   <div class="pos-panel" style="border-color:var(--accent);border-width:1px">
     <!-- Search Bar -->
     <div class="pos-search-bar" style="display:flex;gap:8px;align-items:center;position:relative">
@@ -129,20 +128,6 @@ include __DIR__ . '/../includes/header.php';
         <button class="btn btn-secondary btn-sm" id="draftBtn" onclick="saveDraft()" style="padding:8px 14px;font-size:12px">Save Draft</button>
         <button class="btn-clear-cart" onclick="clearCart()" title="Clear cart">X</button>
       </div>
-      <!-- Draft Retrieval -->
-      <?php if (!empty($drafts)): ?>
-      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
-        <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">Saved Drafts</div>
-        <div style="display:flex;flex-direction:column;gap:4px;max-height:120px;overflow-y:auto">
-          <?php foreach ($drafts as $d): ?>
-            <button class="btn btn-secondary btn-sm" style="display:flex;justify-content:space-between;font-size:11px;padding:5px 8px;text-align:left" onclick="loadDraft(<?= $d['id'] ?>)">
-              <span><?= e($d['draft_no']) ?> — <?= e($d['customer_name'] ?: 'Walk-in') ?></span>
-              <span style="color:var(--accent);font-family:var(--mono)"><?= money($d['total']) ?></span>
-            </button>
-          <?php endforeach; ?>
-        </div>
-      </div>
-      <?php endif; ?>
     </div>
   </div>
 </div>
@@ -549,8 +534,11 @@ function saveDraft() {
   fetch('<?= BASE_URL ?>/pages/pos_draft.php', { method: 'POST', body: fd })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (data.success) { showScanToast('Draft saved: ' + data.draft_no, true); clearCart(); setTimeout(function() { location.reload(); }, 800); }
-      else alert('Error: ' + data.error);
+      if (data.success) {
+        showScanToast('Draft saved: ' + data.draft_no, true);
+        clearCart();
+        refreshDraftsList();
+      } else alert('Error: ' + data.error);
     })
     .catch(function() { alert('Network error.'); });
 }
@@ -578,11 +566,9 @@ function loadDraft(id) {
       }
       renderCart();
       showScanToast('Draft loaded: ' + data.draft_no, true);
-      // Delete the draft from DB (silently)
+      // Delete draft from DB and refresh list
       fetch('<?= BASE_URL ?>/pages/pos_draft.php', { method: 'POST', body: (function(){ var f = new FormData(); f.append('csrf_token', CSRF_TOKEN); f.append('action','delete_draft'); f.append('id', id); return f; })() });
-      // Remove the draft button from the drafts list in the DOM
-      var draftBtn = document.querySelector('[onclick="loadDraft(' + id + ')"]');
-      if (draftBtn) draftBtn.remove();
+      refreshDraftsList();
     });
 }
 
@@ -625,7 +611,6 @@ function submitSale() {
       btn.textContent = 'Checkout'; btn.disabled = false;
       if (data.success) {
         lastSale = data;
-        addToReceiptList(data);
         clearCart();
         showInvoice(data);
       }
@@ -634,32 +619,30 @@ function submitSale() {
     .catch(function() { submitSale._processing = false; btn.textContent = 'Checkout'; btn.disabled = false; alert('Network error. Try again.'); });
 }
 
-/* ── RECEIPT LIST ── */
-var _receiptItems = [];
-function addToReceiptList(s) {
-  _receiptItems.push(s);
-  renderReceiptList();
+/* ── DRAFTS PANEL ── */
+function loadDraftsList() {
+  fetch('<?= BASE_URL ?>/pages/pos_draft.php?action=list')
+    .then(function(r) { return r.json(); })
+    .then(function(drafts) {
+      var container = $id('draftsList');
+      if (!drafts.length) {
+        container.innerHTML = '<div class="empty-state" style="padding:20px 8px;font-size:11px"><div class="empty-icon">&#9998;</div>No saved drafts</div>';
+        return;
+      }
+      container.innerHTML = drafts.map(function(d) {
+        return '<button onclick="loadDraft(' + d.id + ')" style="display:flex;flex-direction:column;gap:2px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;text-align:left;width:100%;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center">' +
+            '<span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text)">' + d.draft_no + '</span>' +
+            '<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent)">' + CURRENCY + parseFloat(d.total).toFixed(2) + '</span>' +
+          '</div>' +
+          '<div style="font-size:10px;color:var(--text3)">' + (d.customer_name || 'Walk-in') + ' &middot; ' + d.item_count + ' items</div>' +
+          '<div style="font-size:10px;color:var(--text3)">' + d.created_at + '</div>' +
+        '</button>';
+      }).join('');
+    });
 }
 
-function renderReceiptList() {
-  if (!_receiptItems.length) return;
-  var html = _receiptItems.map(function(s, idx) {
-    var items = s.items.map(function(i) {
-      return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;border-bottom:1px solid var(--border)">' +
-        '<span style="color:var(--text)">' + i.name + ' &times; ' + i.qty + '</span>' +
-        '<span style="font-family:var(--mono);color:var(--accent)">' + fmt(i.total) + '</span></div>';
-    }).join('');
-    return '<div style="margin-bottom:12px;padding:10px;background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border)">' +
-      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">' +
-        '<span style="font-weight:700;font-family:var(--mono);font-size:12px">' + s.invoice_no + '</span>' +
-        '<span style="font-size:11px;color:var(--text3)">' + s.date + '</span></div>' +
-      '<div style="font-size:11px;color:var(--text2);margin-bottom:6px">' + (s.customer_name || 'Walk-in') + ' &middot; ' + s.payment_method + '</div>' +
-      items +
-      '<div style="text-align:right;margin-top:6px;font-weight:800;font-size:14px;color:var(--accent)">' + fmt(s.total) + '</div>' +
-    '</div>';
-  }).join('');
-  $id('receiptItems').innerHTML = html;
-}
+function refreshDraftsList() { loadDraftsList(); }
 
 /* ── INVOICE ── */
 function showInvoice(s) {
@@ -829,5 +812,10 @@ document.addEventListener('keydown', function(e) {
     </div>
   </div>
 </div>
+
+<script>
+/* Load drafts into panel on page load */
+document.addEventListener('DOMContentLoaded', function() { loadDraftsList(); });
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

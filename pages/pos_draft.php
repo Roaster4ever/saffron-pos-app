@@ -30,6 +30,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['id'])) {
     exit;
 }
 
+// List all drafts for current user
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && (isset($_GET['action']) && $_GET['action'] === 'list')) {
+    $stmt = $conn->prepare("SELECT id, draft_no, customer_name, total, item_count, DATE_FORMAT(created_at, '%d/%m %H:%i') as created_at FROM pos_drafts WHERE user_id=? ORDER BY created_at DESC LIMIT 30");
+    $stmt->bind_param("i", $userId);
+    $stmt->execute();
+    $drafts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    echo json_encode($drafts);
+    exit;
+}
+
 // POST actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_verify()) { echo json_encode(['success' => false, 'error' => 'Invalid security token']); exit; }
