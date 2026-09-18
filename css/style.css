@@ -264,7 +264,7 @@ select.form-control option{background:var(--bg3);color:var(--text);padding:8px}
 .bar-group{display:flex;flex-direction:column;align-items:center;margin-top:auto}
 .bar-val{font-size:9px;color:var(--accent);font-family:var(--mono);margin-bottom:3px;white-space:nowrap}
 .bar{background:linear-gradient(180deg,var(--accent) 0%,var(--accent2) 100%);border-radius:3px 3px 0 0;width:70%;transition:height .3s var(--ease)}
-.bar-empty{background:var(--red)!important;opacity:.7}
+.bar-empty{background:var(--red)!important;border-radius:0}
 .bar-label{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:6px}
 
 /* ═══════════════════════════════════════════
