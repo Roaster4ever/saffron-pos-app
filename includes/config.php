@@ -193,6 +193,7 @@ $SETTINGS = loadSettings($conn);
 define('SHOP_NAME',   $SETTINGS['shop_name']   ?? 'Saffron Sanitary');
 define('SHOP_ADDRESS',$SETTINGS['shop_address'] ?? '');
 define('SHOP_PHONE',  $SETTINGS['shop_phone']   ?? '');
+define('SHOP_EMAIL',  $SETTINGS['shop_email']   ?? '');
 define('CURRENCY',    $SETTINGS['currency']     ?? 'Rs: ');
 define('TAX_RATE',    (float)($SETTINGS['default_tax_rate'] ?? 18));
 define('INVOICE_FOOTER', $SETTINGS['invoice_footer'] ?? 'Thank you for your business!');

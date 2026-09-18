@@ -78,9 +78,6 @@
       <a href="<?= BASE_URL ?>/pages/reports.php" class="nav-item <?= ($activePage??'')==='reports'?'active':'' ?>">
         <span class="nav-icon">&#9879;</span><span>Reports</span>
       </a>
-      <a href="<?= BASE_URL ?>/pages/tax_bulk.php" class="nav-item <?= ($activePage??'')==='tax_bulk'?'active':'' ?>">
-        <span class="nav-icon">&#37;</span><span>Tax Settings</span>
-      </a>
       <a href="<?= BASE_URL ?>/pages/settings.php" class="nav-item <?= ($activePage??'')==='settings'?'active':'' ?>">
         <span class="nav-icon">&#9881;</span><span>Settings</span>
       </a>

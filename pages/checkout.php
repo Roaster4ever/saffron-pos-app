@@ -189,6 +189,8 @@ try {
         'date'           => date('d/m/Y H:i'),
         'shop_name'      => SHOP_NAME,
         'shop_address'   => SHOP_ADDRESS,
+        'shop_phone'     => SHOP_PHONE,
+        'shop_email'     => SHOP_EMAIL,
         'currency'       => CURRENCY,
         'items'          => $itemsOut,
     ]);

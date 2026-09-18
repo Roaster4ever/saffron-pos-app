@@ -714,7 +714,8 @@ function showInvoice(s) {
   '<div id="invPrint" style="font-family:\'IBM Plex Sans\',sans-serif;padding:24px;background:#fff;color:#111">' +
     '<div style="text-align:center;padding-bottom:14px;border-bottom:2px solid #111;margin-bottom:16px">' +
       '<div style="font-size:22px;font-weight:800">' + s.shop_name + '</div>' +
-      '<div style="font-size:11px;color:#666;margin-top:3px">' + (s.shop_address || 'Sales Invoice') + '</div>' +
+      '<div style="font-size:11px;color:#666;margin-top:3px">' + (s.shop_address || '') + '</div>' +
+      (s.shop_phone || s.shop_email ? '<div style="font-size:11px;color:#666;margin-top:2px">' + (s.shop_phone || '') + (s.shop_phone && s.shop_email ? ' · ' : '') + (s.shop_email || '') + '</div>' : '') +
     '</div>' +
     '<div style="display:flex;justify-content:space-between;font-size:12px;color:#444;margin-bottom:14px">' +
       '<div style="line-height:1.8"><div><strong>Invoice #</strong> ' + s.invoice_no + '</div><div><strong>Date</strong> ' + s.date + '</div>' +
