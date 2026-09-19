@@ -14,14 +14,18 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $shopName    = trim($_POST['shop_name'] ?? '');
-    $shopAddress = trim($_POST['shop_address'] ?? '');
-    $shopPhone   = trim($_POST['shop_phone'] ?? '');
-    $adminName   = trim($_POST['admin_name'] ?? '');
-    $adminUser   = trim($_POST['admin_username'] ?? '');
-    $adminPass   = $_POST['admin_password'] ?? '';
-    $adminPass2  = $_POST['admin_password2'] ?? '';
-    $taxRate     = floatval($_POST['tax_rate'] ?? 18);
+    $shopName     = trim($_POST['shop_name'] ?? '');
+    $shopAddress  = trim($_POST['shop_address'] ?? '');
+    $shopPhone    = trim($_POST['shop_phone'] ?? '');
+    $shopWhatsapp = trim($_POST['shop_whatsapp'] ?? '');
+    $shopEmail    = trim($_POST['shop_email'] ?? '');
+    $currency     = trim($_POST['currency'] ?? 'Rs: ');
+    $taxRate      = floatval($_POST['tax_rate'] ?? 18);
+    $adminName    = trim($_POST['admin_name'] ?? '');
+    $adminUser    = trim($_POST['admin_username'] ?? '');
+    $adminPass    = $_POST['admin_password'] ?? '';
+    $adminPass2   = $_POST['admin_password2'] ?? '';
+    $invoiceFooter = trim($_POST['invoice_footer'] ?? 'Thank you for your business!');
 
     // Validation
     if (!$shopName) { $error = 'Shop name is required'; }
@@ -43,7 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 setSetting($conn, 'shop_name', $shopName);
                 setSetting($conn, 'shop_address', $shopAddress);
                 setSetting($conn, 'shop_phone', $shopPhone);
+                setSetting($conn, 'shop_whatsapp', $shopWhatsapp);
+                setSetting($conn, 'shop_email', $shopEmail);
+                setSetting($conn, 'currency', $currency);
                 setSetting($conn, 'default_tax_rate', (string)$taxRate);
+                setSetting($conn, 'invoice_footer', $invoiceFooter);
 
                 // Delete default admin and create new one
                 $conn->query("DELETE FROM users WHERE username='admin'");
@@ -108,14 +116,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label>Address</label>
         <input type="text" name="shop_address" class="form-control" placeholder="Shop address" value="<?= htmlspecialchars($_POST['shop_address'] ?? '') ?>">
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div class="form-group">
           <label>Phone</label>
           <input type="text" name="shop_phone" class="form-control" placeholder="0300-1234567" value="<?= htmlspecialchars($_POST['shop_phone'] ?? '') ?>">
         </div>
         <div class="form-group">
+          <label>WhatsApp</label>
+          <input type="text" name="shop_whatsapp" class="form-control" placeholder="WhatsApp number" value="<?= htmlspecialchars($_POST['shop_whatsapp'] ?? '') ?>">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" name="shop_email" class="form-control" placeholder="shop@example.com" value="<?= htmlspecialchars($_POST['shop_email'] ?? '') ?>">
+        </div>
+        <div class="form-group">
           <label>Default Tax Rate (%)</label>
           <input type="number" name="tax_rate" class="form-control" value="<?= floatval($_POST['tax_rate'] ?? 18) ?>" min="0" max="100" step="0.5">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+        <div class="form-group">
+          <label>Currency Symbol</label>
+          <input type="text" name="currency" class="form-control" placeholder="Rs: " value="<?= htmlspecialchars($_POST['currency'] ?? 'Rs: ') ?>">
+        </div>
+        <div class="form-group">
+          <label>Invoice Footer</label>
+          <input type="text" name="invoice_footer" class="form-control" placeholder="Thank you message" value="<?= htmlspecialchars($_POST['invoice_footer'] ?? 'Thank you for your business!') ?>">
         </div>
       </div>
 
