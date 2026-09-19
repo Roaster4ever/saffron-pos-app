@@ -1,0 +1,64 @@
+worker_processes 1;
+events { worker_connections 1024; }
+
+http {
+    include mime.types;
+    default_type application/octet-stream;
+    sendfile on;
+    keepalive_timeout 65;
+
+    # Logging
+    access_log logs/access.log;
+    error_log logs/error.log;
+
+    # Gzip
+    gzip on;
+    gzip_types text/css application/javascript application/json text/plain;
+
+    server {
+        listen 8080;
+        server_name localhost;
+
+        root ../app;
+        index index.php index.html;
+
+        # Security headers
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'" always;
+
+        # Block access to hidden files
+        location ~ /\. {
+            deny all;
+            access_log off;
+            log_not_found off;
+        }
+
+        # Block access to .env
+        location ~ ^/app/\.env {
+            deny all;
+        }
+
+        location / {
+            error_page 404 /app/404.php;
+            error_page 500 502 503 504 /app/500.php;
+            try_files $uri /app/index.php?$args;
+        }
+
+        location ~ \.php$ {
+            try_files $uri =404;
+            fastcgi_pass 127.0.0.1:9000;
+            fastcgi_index index.php;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            include fastcgi_params;
+        }
+
+        # Static assets
+        location ~* \.(css|js|ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$ {
+            expires 7d;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+}
