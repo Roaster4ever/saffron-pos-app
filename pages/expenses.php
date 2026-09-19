@@ -41,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($act === 'delete') {
+        if (!isAdmin()) { header('Location: ?error=Admin+access+required'); exit; }
         $id = intval($_POST['id']);
         $stmt = $conn->prepare("DELETE FROM expenses WHERE id=?");
         $stmt->bind_param("i", $id);
@@ -77,12 +78,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     $from = $_GET['from'] ?? date('Y-m-d', strtotime('-30 days'));
     $to   = $_GET['to']   ?? date('Y-m-d');
-    $expenses = $conn->query("SELECT e.title, e.amount, ec.name as category, e.note, e.created_at, u.name as user
+    $fromE = date('Y-m-d', strtotime($_GET['from'] ?? '-30 days'));
+    $toE   = date('Y-m-d', strtotime($_GET['to'] ?? 'now'));
+    $stmtExp = $conn->prepare("SELECT e.title, e.amount, ec.name as category, e.note, e.created_at, u.name as user
         FROM expenses e
         LEFT JOIN expense_categories ec ON e.category_id=ec.id
         LEFT JOIN users u ON e.user_id=u.id
-        WHERE DATE(e.created_at) BETWEEN '$from' AND '$to'
-        ORDER BY e.created_at DESC")->fetch_all(MYSQLI_ASSOC);
+        WHERE DATE(e.created_at) BETWEEN ? AND ?
+        ORDER BY e.created_at DESC");
+    $stmtExp->bind_param("ss", $fromE, $toE);
+    $stmtExp->execute();
+    $expenses = $stmtExp->get_result()->fetch_all(MYSQLI_ASSOC);
     $headers = ['title','amount','category','note','date','user'];
     $rows = array_map(function($e) {
         return array_map('csvEscape', [

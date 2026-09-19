@@ -500,10 +500,11 @@ $lastSale = $conn->query("SELECT MAX(created_at) d FROM sales")->fetch_assoc()['
 $productCount = $conn->query("SELECT COUNT(*) c FROM products")->fetch_assoc()['c'];
 ?>
 
-<main class="main-content">
-  <div class="content-header">
-    <h1>Data & Backup</h1>
+<div class="page-header">
+  <div>
+    <div class="page-title">Data & Backup</div>
   </div>
+</div>
 
   <?php if (isset($_GET['msg'])): ?>
     <div class="alert alert-success"><?= e(str_replace('+', ' ', $_GET['msg'])) ?></div>
@@ -866,8 +867,6 @@ $productCount = $conn->query("SELECT COUNT(*) c FROM products")->fetch_assoc()['
   </div>
 
 <?php endif; ?>
-</main>
-
 <script>
 document.querySelectorAll('input[name="restore_file"]').forEach(function(el) {
   el.addEventListener('change', function() {

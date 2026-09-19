@@ -10,7 +10,10 @@ $activePage = 'pos';
 $customers = $conn->query("SELECT id, name, type, credit_limit FROM customers_v2 WHERE is_active=1 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
 
 // Fetch drafts
-$drafts = $conn->query("SELECT id, draft_no, customer_name, total, item_count, created_at FROM pos_drafts WHERE user_id={$_SESSION['user_id']} ORDER BY created_at DESC LIMIT 10")->fetch_all(MYSQLI_ASSOC);
+$draftStmt = $conn->prepare("SELECT id, draft_no, customer_name, total, item_count, created_at FROM pos_drafts WHERE user_id=? ORDER BY created_at DESC LIMIT 10");
+$draftStmt->bind_param("i", $_SESSION['user_id']);
+$draftStmt->execute();
+$drafts = $draftStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 include __DIR__ . '/../includes/header.php';
 ?>

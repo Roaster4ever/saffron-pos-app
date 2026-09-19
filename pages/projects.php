@@ -39,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($act === 'delete') {
+        if (!isAdmin()) { header('Location: ?error=Admin+access+required'); exit; }
         $id = intval($_POST['id']);
         $stmt = $conn->prepare("DELETE FROM projects WHERE id=?");
         $stmt->bind_param("i", $id);

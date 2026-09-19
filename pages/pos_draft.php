@@ -130,7 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $itemsJson = json_encode(array_values($cart));
         $stmt = $conn->prepare("UPDATE pos_drafts SET customer_id=?, customer_name=?, subtotal=?, discount=?, tax=?, total=?, payment_method=?, item_count=?, items_json=? WHERE id=? AND user_id=?");
-        $stmt->bind_param("isddddsiiii", $customerId, $customerName, $subtotal, $discount, $taxTotal, $total, $paymentMethod, $itemCount, $itemsJson, $draftId, $userId);
+        $stmt->bind_param("isddddsisis", $customerId, $customerName, $subtotal, $discount, $taxTotal, $total, $paymentMethod, $itemCount, $itemsJson, $draftId, $userId);
         $stmt->execute();
 
         echo json_encode(['success' => true, 'id' => $draftId]);
