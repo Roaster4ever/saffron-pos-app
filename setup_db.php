@@ -1,46 +1,40 @@
 <?php
 /**
- * Saffron POS — Database Setup Script (CLI)
- * Run this on first install to initialize the database.
+ * Saffron POS — Database Initializer
+ * Creates all tables and seeds default data.
+ * Called by setup-wizard.bat on first install.
  */
 
 $host = '127.0.0.1';
 $port = 3306;
 $user = 'root';
 $pass = '';
-$dbName = 'saffron_pos';
+$db   = 'saffron_pos';
 
-echo "=== Saffron POS Database Setup ===\n\n";
+echo "  Connecting to database...\n";
 
-// Connect without database
 $conn = new mysqli($host, $user, $pass, '', $port);
 if ($conn->connect_error) {
-    echo "[ERROR] Cannot connect to MariaDB: " . $conn->connect_error . "\n";
-    echo "Make sure MariaDB is running.\n";
+    echo "  [ERROR] Cannot connect to MariaDB: " . $conn->connect_error . "\n";
+    echo "  Make sure MariaDB is running.\n";
     exit(1);
 }
 
-echo "[OK] Connected to MariaDB.\n";
+$conn->query("CREATE DATABASE IF NOT EXISTS `$db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+$conn->select_db($db);
+echo "  Database ready.\n";
 
-// Create database
-$conn->query("CREATE DATABASE IF NOT EXISTS `$dbName` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-$conn->select_db($dbName);
-echo "[OK] Database '$dbName' ready.\n";
-
-// Check if tables already exist
-$result = $conn->query("SHOW TABLES LIKE 'users'");
-if ($result && $result->num_rows > 0) {
-    echo "[OK] Tables already exist. Skipping creation.\n";
-    echo "\nDatabase is ready!\n";
+// Check if already set up
+$res = $conn->query("SHOW TABLES LIKE 'users'");
+if ($res && $res->num_rows > 0) {
+    echo "  Tables already exist. Skipping creation.\n";
     $conn->close();
     exit(0);
 }
 
-// Create all tables
-echo "Creating tables...\n";
+echo "  Creating tables...\n";
 
 $tables = [
-    // Users
     "CREATE TABLE IF NOT EXISTS `users` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `username` VARCHAR(50) NOT NULL UNIQUE,
@@ -50,7 +44,6 @@ $tables = [
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // Settings
     "CREATE TABLE IF NOT EXISTS `settings` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `setting_key` VARCHAR(100) NOT NULL UNIQUE,
@@ -60,21 +53,18 @@ $tables = [
         `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // Categories
     "CREATE TABLE IF NOT EXISTS `categories` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(100) NOT NULL,
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // Brands
     "CREATE TABLE IF NOT EXISTS `brands` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(100) NOT NULL,
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // Units
     "CREATE TABLE IF NOT EXISTS `units` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(50) NOT NULL,
@@ -83,7 +73,6 @@ $tables = [
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // Products
     "CREATE TABLE IF NOT EXISTS `products` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `category_id` INT,
@@ -117,7 +106,6 @@ $tables = [
         INDEX `idx_brand` (`brand_id`)
     ) ENGINE=InnoDB",
 
-    // Customers v2
     "CREATE TABLE IF NOT EXISTS `customers_v2` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(200) NOT NULL,
@@ -134,7 +122,6 @@ $tables = [
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // Sales
     "CREATE TABLE IF NOT EXISTS `sales` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `invoice_no` VARCHAR(30) NOT NULL UNIQUE,
@@ -158,7 +145,6 @@ $tables = [
         INDEX `idx_status` (`status`)
     ) ENGINE=InnoDB",
 
-    // Sale Items
     "CREATE TABLE IF NOT EXISTS `sale_items` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `sale_id` INT NOT NULL,
@@ -174,7 +160,6 @@ $tables = [
         INDEX `idx_product` (`product_id`)
     ) ENGINE=InnoDB",
 
-    // Customer Ledger
     "CREATE TABLE IF NOT EXISTS `customer_ledger` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `customer_id` INT NOT NULL,
@@ -189,7 +174,6 @@ $tables = [
         INDEX `idx_customer` (`customer_id`)
     ) ENGINE=InnoDB",
 
-    // Customer Payments
     "CREATE TABLE IF NOT EXISTS `customer_payments` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `customer_id` INT NOT NULL,
@@ -202,7 +186,6 @@ $tables = [
         INDEX `idx_customer` (`customer_id`)
     ) ENGINE=InnoDB",
 
-    // Inventory Log
     "CREATE TABLE IF NOT EXISTS `inventory_log` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `product_id` INT NOT NULL,
@@ -217,7 +200,6 @@ $tables = [
         INDEX `idx_product` (`product_id`)
     ) ENGINE=InnoDB",
 
-    // Expenses
     "CREATE TABLE IF NOT EXISTS `expenses` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `title` VARCHAR(200) NOT NULL,
@@ -228,14 +210,12 @@ $tables = [
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // Expense Categories
     "CREATE TABLE IF NOT EXISTS `expense_categories` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(100) NOT NULL,
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // Quotations
     "CREATE TABLE IF NOT EXISTS `quotations` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `quotation_no` VARCHAR(30) NOT NULL UNIQUE,
@@ -253,7 +233,6 @@ $tables = [
         `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // Quotation Items
     "CREATE TABLE IF NOT EXISTS `quotation_items` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `quotation_id` INT NOT NULL,
@@ -269,7 +248,6 @@ $tables = [
         INDEX `idx_quotation` (`quotation_id`)
     ) ENGINE=InnoDB",
 
-    // Orders
     "CREATE TABLE IF NOT EXISTS `orders` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `order_no` VARCHAR(30) NOT NULL UNIQUE,
@@ -287,7 +265,6 @@ $tables = [
         `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // Order Items
     "CREATE TABLE IF NOT EXISTS `order_items` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `order_id` INT NOT NULL,
@@ -302,7 +279,6 @@ $tables = [
         INDEX `idx_order` (`order_id`)
     ) ENGINE=InnoDB",
 
-    // Deliveries
     "CREATE TABLE IF NOT EXISTS `deliveries` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `delivery_no` VARCHAR(30) NOT NULL UNIQUE,
@@ -315,7 +291,6 @@ $tables = [
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // Delivery Items
     "CREATE TABLE IF NOT EXISTS `delivery_items` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `delivery_id` INT NOT NULL,
@@ -328,7 +303,6 @@ $tables = [
         INDEX `idx_delivery` (`delivery_id`)
     ) ENGINE=InnoDB",
 
-    // Projects
     "CREATE TABLE IF NOT EXISTS `projects` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(200) NOT NULL,
@@ -339,7 +313,6 @@ $tables = [
         `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB",
 
-    // POS Drafts
     "CREATE TABLE IF NOT EXISTS `pos_drafts` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `draft_no` VARCHAR(30) NOT NULL,
@@ -357,7 +330,6 @@ $tables = [
         INDEX `idx_user` (`user_id`)
     ) ENGINE=InnoDB",
 
-    // User Sessions
     "CREATE TABLE IF NOT EXISTS `user_sessions` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `user_id` INT NOT NULL,
@@ -369,14 +341,12 @@ $tables = [
         INDEX `idx_user` (`user_id`)
     ) ENGINE=InnoDB",
 
-    // Login Attempts
     "CREATE TABLE IF NOT EXISTS `login_attempts` (
         `ip_address` VARCHAR(45) NOT NULL PRIMARY KEY,
         `attempt_count` INT DEFAULT 0,
         `first_attempt` INT NOT NULL
     ) ENGINE=InnoDB",
 
-    // Audit Log
     "CREATE TABLE IF NOT EXISTS `audit_log` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `user_id` INT,
@@ -390,7 +360,6 @@ $tables = [
         INDEX `idx_created` (`created_at`)
     ) ENGINE=InnoDB",
 
-    // App Sessions (for DB-backed sessions on Vercel)
     "CREATE TABLE IF NOT EXISTS `app_sessions` (
         `id` VARCHAR(128) NOT NULL PRIMARY KEY,
         `data` LONGTEXT NOT NULL,
@@ -398,7 +367,6 @@ $tables = [
         INDEX `idx_expires` (`expires`)
     ) ENGINE=InnoDB",
 
-    // Suppliers
     "CREATE TABLE IF NOT EXISTS `suppliers` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `name` VARCHAR(200) NOT NULL,
@@ -414,14 +382,14 @@ $tables = [
 
 foreach ($tables as $sql) {
     if (!$conn->query($sql)) {
-        echo "[ERROR] Failed: " . $conn->error . "\n";
+        echo "  [WARN] " . $conn->error . "\n";
     }
 }
-echo "[OK] All tables created.\n";
+echo "  Tables created.\n";
 
 // Seed default settings
 $defaults = [
-    ['shop_name', 'Saffron POS', 'string'],
+    ['shop_name', 'My Shop', 'string'],
     ['shop_address', '', 'string'],
     ['shop_phone', '', 'string'],
     ['shop_whatsapp', '', 'string'],
@@ -441,48 +409,38 @@ foreach ($defaults as [$key, $val, $type]) {
     $stmt->bind_param("sss", $key, $val, $type);
     $stmt->execute();
 }
-echo "[OK] Default settings inserted.\n";
+echo "  Default settings inserted.\n";
 
-// Seed default units
+// Seed units
 $units = [
-    ['Piece', 'pc', 0],
-    ['Box', 'box', 0],
-    ['Set', 'set', 0],
-    ['Meter', 'm', 1],
-    ['Foot', 'ft', 1],
-    ['Kilogram', 'kg', 1],
-    ['Roll', 'roll', 0],
-    ['Pack', 'pack', 0],
+    ['Piece', 'pc', 0], ['Box', 'box', 0], ['Set', 'set', 0],
+    ['Meter', 'm', 1], ['Foot', 'ft', 1], ['Kilogram', 'kg', 1],
+    ['Roll', 'roll', 0], ['Pack', 'pack', 0],
 ];
 $stmt = $conn->prepare("INSERT IGNORE INTO units (name, short_name, allows_decimal) VALUES (?, ?, ?)");
-foreach ($units as [$name, $short, $decimal]) {
-    $stmt->bind_param("ssi", $name, $short, $decimal);
+foreach ($units as [$n, $s, $d]) {
+    $stmt->bind_param("ssi", $n, $s, $d);
     $stmt->execute();
 }
-echo "[OK] Default units inserted.\n";
+echo "  Default units inserted.\n";
 
-// Seed default expense categories
-$expCats = ['Rent', 'Utilities', 'Salaries', 'Transport', 'Office Supplies', 'Marketing', 'Maintenance', 'Other'];
+// Seed expense categories
+$cats = ['Rent', 'Utilities', 'Salaries', 'Transport', 'Office Supplies', 'Marketing', 'Maintenance', 'Other'];
 $stmt = $conn->prepare("INSERT IGNORE INTO expense_categories (name) VALUES (?)");
-foreach ($expCats as $cat) {
-    $stmt->bind_param("s", $cat);
+foreach ($cats as $c) {
+    $stmt->bind_param("s", $c);
     $stmt->execute();
 }
-echo "[OK] Default expense categories inserted.\n";
+echo "  Default expense categories inserted.\n";
 
-// Seed default admin user (admin / admin123)
-$adminPass = password_hash('admin123', PASSWORD_DEFAULT);
+// Seed default admin (admin / admin123)
+$hash = password_hash('admin123', PASSWORD_DEFAULT);
 $stmt = $conn->prepare("INSERT IGNORE INTO users (username, name, password, role) VALUES (?, ?, ?, ?)");
-$username = 'admin';
-$name = 'Administrator';
-$role = 'admin';
-$stmt->bind_param("ssss", $username, $name, $adminPass, $role);
+$u = 'admin'; $n = 'Administrator'; $r = 'admin';
+$stmt->bind_param("ssss", $u, $n, $hash, $r);
 $stmt->execute();
-echo "[OK] Default admin user created (admin / admin123).\n";
+echo "  Default admin created (admin / admin123).\n";
 
 $conn->close();
 
-echo "\n=== Database setup complete! ===\n";
-echo "You can now access Saffron POS at http://localhost:8080\n";
-echo "Login: admin / admin123\n";
-echo "\nIMPORTANT: Change the admin password after first login!\n";
+echo "\n  Database setup complete!\n";

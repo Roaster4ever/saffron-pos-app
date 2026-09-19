@@ -1,4 +1,4 @@
-# Runtime binaries (download before building)
+# Runtime binaries (downloaded by build.bat)
 runtime/php/
 runtime/mariadb/
 runtime/nginx/
@@ -6,8 +6,5 @@ runtime/nginx/
 # Build output
 dist/
 
-# Generated resources
-resources/wizard-image.bmp
-resources/wizard-small.bmp
-resources/icon.ico
-resources/saffron.exe
+# Temporary build directory (created by build.bat)
+app_build/

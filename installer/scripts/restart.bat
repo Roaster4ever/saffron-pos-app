@@ -1,6 +1,0 @@
-@echo off
-echo Stopping services...
-call "%~dp0stop.bat"
-echo.
-echo Starting services...
-call "%~dp0start.bat"

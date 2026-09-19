@@ -3,61 +3,74 @@ setlocal
 title Saffron POS - Setup Wizard
 color 0B
 
-set "APP_DIR=%~dp0.."
-set "PHP_DIR=%APP_DIR%\php"
-set "MARIADB_DIR=%APP_DIR%\mariadb"
+set "BASE=%~dp0"
+set "PHP=%BASE%php"
+set "MARIADB=%BASE%mariadb"
+set "APP=%BASE%app"
 
-echo ============================================================
-echo    Saffron POS - Setup Wizard
-echo ============================================================
 echo.
-echo    This wizard will:
-echo    1. Initialize the database (if needed)
-echo    2. Open the web-based setup page
-echo    3. Let you configure shop name, admin password, etc.
+echo  ========================================
+echo   Saffron POS - Setup Wizard
+echo  ========================================
 echo.
 
-:: ── Check if MariaDB is running ──
-echo Checking if MariaDB is running...
+:: ── Make sure MariaDB is running ──
 tasklist /FI "IMAGENAME eq mariadbd.exe" 2>nul | find /I "mariadbd.exe" >nul
 if %errorlevel% neq 0 (
-    echo   MariaDB is not running. Starting...
-    if not exist "%MARIADB_DIR%\data" (
-        echo   Initializing database...
-        "%MARIADB_DIR%\bin\mariadb-install-db.exe" --datadir="%MARIADB_DIR%\data" --service=MariaDB --password="" >nul 2>&1
+    echo  Starting database...
+    if not exist "%MARIADB%\data" (
+        echo  Initializing database...
+        "%MARIADB%\bin\mariadb-install-db.exe" --datadir="%MARIADB%\data" --password="" >nul 2>&1
     )
-    start "" /B "%MARIADB_DIR%\bin\mariadbd.exe" --datadir="%MARIADB_DIR%\data" --port=3306 --console >nul 2>&1
+    start "" /B "%MARIADB%\bin\mariadbd.exe" --datadir="%MARIADB%\data" --port=3306 --console >nul 2>&1
     timeout /t 3 /nobreak >nul
-    echo   [OK] MariaDB started.
+    echo  Database started.
 ) else (
-    echo   [OK] MariaDB is already running.
+    echo  Database is running.
 )
 
-:: ── Initialize database if needed ──
-echo.
-echo Initializing database...
-"%PHP_DIR%\php.exe" "%APP_DIR%\scripts\setup-db.php"
+:: ── Make sure PHP is running ──
+tasklist /FI "IMAGENAME eq php-cgi.exe" 2>nul | find /I "php-cgi.exe" >nul
 if %errorlevel% neq 0 (
-    echo   [WARN] Database setup encountered issues. You can configure manually.
+    tasklist /FI "IMAGENAME eq php.exe" 2>nul | find /I "php.exe" >nul
+    if %errorlevel% neq 0 (
+        echo  Starting PHP...
+        if exist "%PHP%\php-cgi.exe" (
+            start "" /B "%PHP%\php-cgi.exe" -b 127.0.0.1:9000 -c "%PHP%\php.ini" >nul 2>&1
+        ) else (
+            start "" /B "%PHP%\php.exe" -S 127.0.0.1:9000 -t "%APP%" >nul 2>&1
+        )
+        timeout /t 2 /nobreak >nul
+        echo  PHP started.
+    )
 )
 
-:: ── Start Nginx if not running ──
+:: ── Make sure Nginx is running ──
 tasklist /FI "IMAGENAME eq nginx.exe" 2>nul | find /I "nginx.exe" >nul
 if %errorlevel% neq 0 (
-    echo Starting web server...
-    start "" /B "%APP_DIR%\nginx\nginx.exe" -p "%APP_DIR%\nginx" -c "%APP_DIR%\config\nginx.conf" >nul 2>&1
-    timeout /t 2 /nobreak >nul
+    echo  Starting web server...
+    start "" /B "%BASE%nginx\nginx.exe" -p "%BASE%nginx" -c "%BASE%nginx\conf\nginx.conf" >nul 2>&1
+    timeout /t 1 /nobreak >nul
+    echo  Web server started.
 )
 
-:: ── Open setup page in browser ──
+:: ── Initialize database tables ──
 echo.
-echo Opening setup wizard in your browser...
+echo  Setting up database...
+"%PHP%\php.exe" "%APP%\setup_db.php" 2>nul
+if %errorlevel% neq 0 (
+    echo  [NOTE] If database setup had issues, you can configure manually.
+)
+
+:: ── Open setup page ──
+echo.
+echo  Opening setup wizard in your browser...
 start http://localhost:8080/setup.php
 
 echo.
-echo ============================================================
-echo    Follow the instructions in your browser to complete
-echo    the setup. You can close this window when done.
-echo ============================================================
+echo  ========================================
+echo   Follow the instructions in your browser
+echo   to configure your shop details.
+echo  ========================================
 echo.
 pause
