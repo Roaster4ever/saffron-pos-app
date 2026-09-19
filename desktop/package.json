@@ -1,0 +1,65 @@
+{
+  "name": "saffron-pos",
+  "version": "2.0.0",
+  "description": "Saffron POS - Desktop Point of Sale System",
+  "main": "main.js",
+  "author": "Saffron POS",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win nsis",
+    "build:dir": "electron-builder --win --dir"
+  },
+  "build": {
+    "appId": "com.saffron.pos",
+    "productName": "Saffron POS",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Saffron POS",
+      "deleteAppDataOnUninstall": false
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "titlebar.html"
+    ],
+    "extraResources": [
+      {
+        "from": "php",
+        "to": "php"
+      },
+      {
+        "from": "mariadb",
+        "to": "mariadb"
+      },
+      {
+        "from": "nginx",
+        "to": "nginx"
+      },
+      {
+        "from": "app",
+        "to": "app"
+      }
+    ],
+    "compression": "maximum",
+    "artifactName": "SaffronPOS-${version}-Setup.${ext}"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  }
+}

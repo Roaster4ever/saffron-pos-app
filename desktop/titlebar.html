@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Saffron POS</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a14; color: #e0e0e0; font-family: 'IBM Plex Sans', sans-serif; overflow: hidden; }
+.titlebar {
+  height: 36px; background: #0d0d1a; display: flex; align-items: center;
+  justify-content: space-between; padding: 0 8px; -webkit-app-region: drag;
+  border-bottom: 1px solid #1a1a2e; user-select: none;
+}
+.titlebar-title {
+  font-size: 12px; font-weight: 500; color: #888; letter-spacing: 0.5px;
+  display: flex; align-items: center; gap: 8px;
+}
+.titlebar-title .accent { color: #e8ff3a; font-weight: 600; }
+.titlebar-controls {
+  display: flex; gap: 2px; -webkit-app-region: no-drag;
+}
+.titlebar-btn {
+  width: 36px; height: 36px; border: none; background: transparent;
+  color: #888; font-size: 14px; cursor: pointer; display: flex;
+  align-items: center; justify-content: center; transition: all 0.15s;
+}
+.titlebar-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.titlebar-btn.close:hover { background: #e81123; color: #fff; }
+.loading-screen {
+  position: fixed; top: 36px; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: #0a0a14; z-index: 9999; transition: opacity 0.5s;
+}
+.loading-screen.hidden { opacity: 0; pointer-events: none; }
+.loading-spinner {
+  width: 40px; height: 40px; border: 3px solid #1a1a2e;
+  border-top-color: #e8ff3a; border-radius: 50%;
+  animation: spin 0.8s linear infinite; margin-bottom: 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { color: #666; font-size: 13px; }
+.frame { position: fixed; top: 36px; left: 0; right: 0; bottom: 0; border: none; }
+</style>
+</head>
+<body>
+<div class="titlebar">
+  <div class="titlebar-title">
+    <span class="accent">&#9670;</span> SAFFRON POS
+  </div>
+  <div class="titlebar-controls">
+    <button class="titlebar-btn" onclick="window.electronAPI?.minimize()" title="Minimize">
+      <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
+    </button>
+    <button class="titlebar-btn" onclick="window.electronAPI?.maximize()" title="Maximize">
+      <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+    </button>
+    <button class="titlebar-btn close" onclick="window.electronAPI?.close()" title="Close">
+      <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.2"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Starting Saffron POS...</div>
+</div>
+
+<iframe class="frame" id="appFrame" src="http://localhost:8080"></iframe>
+
+<script>
+const frame = document.getElementById('appFrame');
+const loading = document.getElementById('loadingScreen');
+let loaded = false;
+
+frame.onload = () => {
+  if (!loaded) {
+    loaded = true;
+    setTimeout(() => loading.classList.add('hidden'), 500);
+    setTimeout(() => loading.remove(), 1500);
+  }
+};
+
+// Fallback: hide loading after 10s regardless
+setTimeout(() => {
+  if (!loaded) {
+    loaded = true;
+    loading.classList.add('hidden');
+    setTimeout(() => loading.remove(), 1500);
+  }
+}, 10000);
+
+// Retry loading if iframe fails
+frame.onerror = () => {
+  setTimeout(() => { frame.src = frame.src; }, 2000);
+};
+</script>
+</body>
+</html>

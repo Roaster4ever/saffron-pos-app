@@ -1,0 +1,13 @@
+# Runtime binaries (downloaded by build.bat)
+php/
+mariadb/
+nginx/
+app/
+node_runtime/
+
+# npm
+node_modules/
+package-lock.json
+
+# Build output
+dist/
